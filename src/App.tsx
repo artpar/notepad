@@ -13,34 +13,38 @@ interface Document {
   updatedAt: Date;
 }
 
+// Helper function to load documents from localStorage
+const loadDocumentsFromStorage = (): Document[] => {
+  try {
+    const savedDocs = localStorage.getItem('engineer-notepad-docs');
+    if (savedDocs) {
+      return JSON.parse(savedDocs).map((doc: any) => ({
+        ...doc,
+        createdAt: new Date(doc.createdAt),
+        updatedAt: new Date(doc.updatedAt)
+      }));
+    }
+  } catch (e) {
+    console.error('Error loading documents from localStorage:', e);
+  }
+  return [];
+};
+
 function App() {
-  // State for documents and UI
-  const [documents, setDocuments] = useState<Document[]>([]);
+  // State for documents and UI - initialize from localStorage
+  const [documents, setDocuments] = useState<Document[]>(loadDocumentsFromStorage());
   const [activeDoc, setActiveDoc] = useState<Document | null>(null);
   const [activeTab, setActiveTab] = useState<'files' | 'editor'>('files');
   const [isDarkMode, setIsDarkMode] = useState(false);
   const editorRef = useRef<HTMLTextAreaElement>(null);
 
-  // Load documents from localStorage on startup
-  useEffect(() => {
-    const savedDocs = localStorage.getItem('engineer-notepad-docs');
-    if (savedDocs) {
-      try {
-        const parsedDocs = JSON.parse(savedDocs).map((doc: any) => ({
-          ...doc,
-          createdAt: new Date(doc.createdAt),
-          updatedAt: new Date(doc.updatedAt)
-        }));
-        setDocuments(parsedDocs);
-      } catch (e) {
-        console.error('Error loading documents:', e);
-      }
-    }
-  }, []);
-
   // Save documents to localStorage whenever they change
   useEffect(() => {
-    localStorage.setItem('engineer-notepad-docs', JSON.stringify(documents));
+    try {
+      localStorage.setItem('engineer-notepad-docs', JSON.stringify(documents));
+    } catch (e) {
+      console.error('Error saving documents to localStorage:', e);
+    }
   }, [documents]);
 
   // Create a new document
