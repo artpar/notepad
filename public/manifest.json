@@ -1,0 +1,52 @@
+// public/manifest.json
+{
+  "short_name": "Eng Notepad",
+  "name": "Engineer's Notepad",
+  "description": "A comprehensive offline notepad for engineers with code editing, diagramming, and more",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "assets/icons/icon-192x192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/icons/icon-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#4a7bab",
+  "background_color": "#ffffff",
+  "orientation": "any",
+  "categories": ["productivity", "utilities", "development"],
+  "shortcuts": [
+    {
+      "name": "New Document",
+      "short_name": "New",
+      "description": "Create a new document",
+      "url": "/?action=new"
+    },
+    {
+      "name": "Open Terminal",
+      "short_name": "Terminal",
+      "description": "Open the terminal",
+      "url": "/?action=terminal"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "assets/screenshots/screenshot1.png",
+      "type": "image/png",
+      "sizes": "1280x720"
+    }
+  ]
+}
