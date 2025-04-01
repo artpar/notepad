@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSettings } from '../../contexts/SettingsContext';
 import CodeEditor from '../Editor/CodeEditor';
 import mermaid from 'mermaid';
+import 'remixicon/fonts/remixicon.css';
 
 const DiagramTool: React.FC = () => {
   const { currentTheme } = useSettings();
@@ -128,16 +129,18 @@ const DiagramTool: React.FC = () => {
         <h2 className="font-semibold">Mermaid Diagram Editor</h2>
         <div className="flex space-x-2">
           <button
-            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center"
             onClick={handleExportSVG}
+            title="Export as SVG"
           >
-            Export SVG
+            <i className="ri-file-download-line mr-1"></i> SVG
           </button>
           <button
-            className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+            className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 flex items-center"
             onClick={handleExportPNG}
+            title="Export as PNG"
           >
-            Export PNG
+            <i className="ri-image-line mr-1"></i> PNG
           </button>
         </div>
       </div>

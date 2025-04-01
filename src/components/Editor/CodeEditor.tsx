@@ -69,10 +69,15 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
         EditorView.theme({
           "&": {
             fontSize: `${settings.editor.fontSize}px`,
-            height: "100%",
+            width: "100%",
           },
           ".cm-content": {
             fontFamily: "monospace",
+            height: "100%",
+          },
+          ".cm-scroller": {
+            overflow: "auto",
+            height: "100%",
           },
           "&.cm-focused": {
             outline: "none"
@@ -98,7 +103,9 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
           if (update.docChanged) {
             const newContent = update.state.doc.toString();
             setEditorContent(newContent);
-            onChange(newContent);
+            if (typeof onChange === 'function') {
+              onChange(newContent);
+            }
           }
         }),
         EditorView.editable.of(!readOnly)
@@ -132,11 +139,16 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
   }, [content]);
 
   return (
-    <div className="flex flex-1 h-full w-full">
+    <div className="" style={{
+      'height': '100%',
+      'width': '100%',
+    }}>
       <div
         ref={editorRef}
-        className="h-full  h-max w-full overflow-auto"
+        className=""
         style={{
+          'height': '100%',
+          'width': '100%',
           backgroundColor: currentTheme.isDark ? '#1e1e1e' : '#ffffff',
           color: currentTheme.isDark ? '#d4d4d4' : '#333333',
         }}

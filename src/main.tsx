@@ -5,11 +5,14 @@ import './styles.css'
 import './App.css'
 import App from './App.tsx'
 import { SettingsProvider } from './contexts/SettingsContext'
+import { DocumentProvider } from './contexts/DocumentContext'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <SettingsProvider>
-      <App />
+      <DocumentProvider>
+        <App />
+      </DocumentProvider>
     </SettingsProvider>
   </StrictMode>,
 )

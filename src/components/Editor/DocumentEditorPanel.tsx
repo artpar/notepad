@@ -13,6 +13,14 @@ const DocumentEditorPanel: React.FC<IDockviewPanelProps<DocumentEditorPanelProps
     const {params} = props;
     const {document, onUpdate} = params;
 
+    console.log("DocumentEditorPanel", document.id, document.content)
+    // Handle content updates
+    const handleContentChange = (content: string) => {
+        if (typeof onUpdate === 'function') {
+            onUpdate(content);
+        }
+    };
+
     // Map DocType to CodeLanguage
     const getLanguage = (type: string) => {
         switch (type) {
@@ -33,7 +41,7 @@ const DocumentEditorPanel: React.FC<IDockviewPanelProps<DocumentEditorPanelProps
         <CodeEditor
             content={document.content}
             language={getLanguage(document.type)}
-            onChange={onUpdate}
+            onChange={handleContentChange}
         />
     );
 };

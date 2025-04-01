@@ -1,6 +1,7 @@
 // src/components/UI/Sidebar.tsx
 import React, { useState } from 'react';
 import { Document } from '../../types/document';
+import 'remixicon/fonts/remixicon.css';
 
 type DocType = 'text' | 'markdown' | 'javascript' | 'python' | 'html';
 
@@ -33,7 +34,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <div 
+    <div
       className={`sidebar-container transition-all duration-300 ${
         isCollapsed ? 'w-12' : 'w-64'
       } bg-gray-100 dark:bg-gray-800 flex flex-col h-full border-r border-gray-200 dark:border-gray-700`}
@@ -41,33 +42,20 @@ const Sidebar: React.FC<SidebarProps> = ({
       onMouseLeave={() => !isPinned && setIsCollapsed(true)}
     >
       <div className="sidebar-header flex items-center justify-between p-2 border-b border-gray-200 dark:border-gray-700">
-        {!isCollapsed && <h3 className="text-lg font-semibold">Explorer</h3>}
-        <div className="flex items-center">
-          <button 
-            onClick={togglePin} 
+        <div className="flex items-center ">
+          <button
+            onClick={togglePin}
             className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
             title={isPinned ? "Unpin Sidebar" : "Pin Sidebar"}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              {isPinned ? (
-                <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
-              ) : (
-                <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" fillOpacity="0.5" />
-              )}
-            </svg>
+            <i className={`ri-pushpin-${isPinned ? 'fill' : 'line'} text-lg`}></i>
           </button>
-          <button 
-            onClick={toggleCollapse} 
+          <button
+            onClick={toggleCollapse}
             className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 ml-1"
             title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              {isCollapsed ? (
-                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-              ) : (
-                <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-              )}
-            </svg>
+            <i className={`ri-arrow-${isCollapsed ? 'right' : 'left'}-s-line text-lg`}></i>
           </button>
         </div>
       </div>
@@ -90,20 +78,20 @@ const Sidebar: React.FC<SidebarProps> = ({
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="documents-list">
                   {documents.length === 0 ? (
                     <p className="no-docs">No documents yet. Create one to get started!</p>
                   ) : (
                     documents.map(doc => (
-                      <div 
-                        key={doc.id} 
+                      <div
+                        key={doc.id}
                         className="document-item"
                         onClick={() => onSelectDocument(doc)}
                       >
                         <span className="doc-title">{doc.title}</span>
                         <span className="doc-type">{doc.type}</span>
-                        <button 
+                        <button
                           className="delete-button"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -112,7 +100,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                             }
                           }}
                         >
-                          ×
+                          <i className="ri-close-line"></i>
                         </button>
                       </div>
                     ))

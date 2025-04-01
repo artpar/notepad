@@ -209,6 +209,19 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const updateDocument = useCallback((id: number, content: string) => {
+    console.log("DocumentContext: updateDocument", id, content);
+    
+    // Update the document in the documents array
+    setDocuments(prev => {
+      return prev.map(doc => {
+        if (doc.id === id) {
+          return { ...doc, content, updatedAt: new Date() };
+        }
+        return doc;
+      });
+    });
+    
+    // Update active document if it's the one being edited
     setActiveDocument(prev => {
       if (prev && prev.id === id) {
         return { ...prev, content, updatedAt: new Date() };
@@ -216,17 +229,29 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return prev;
     });
     
+    // Mark document as dirty
     setDocumentStates(prev => ({
       ...prev,
       [id]: { ...prev[id], isDirty: true }
     }));
     
+    // Update tabs
     setOpenTabs(prev => 
       prev.map(tab => 
         tab.documentId === id ? { ...tab, isDirty: true } : tab
       )
     );
-  }, []);
+    
+    // Trigger immediate save for the document
+    const docToSave = documents.find(doc => doc.id === id);
+    if (docToSave) {
+      const updatedDoc = { ...docToSave, content, updatedAt: new Date() };
+      // Use setTimeout to avoid state update conflicts
+      setTimeout(() => {
+        saveDocument(updatedDoc);
+      }, 0);
+    }
+  }, [documents, saveDocument]);
 
   const switchTab = (tabId: string) => {
     const tab = openTabs.find(t => t.id === tabId);

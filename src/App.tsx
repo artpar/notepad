@@ -1,8 +1,8 @@
 // src/App.tsx
-import {useEffect, useMemo, useState} from 'react';
+import {useEffect, useMemo, useState, useCallback} from 'react';
 import './App.css';
-import Sidebar from './components/UI/Sidebar';
-
+import Sidebar from './components/Layout/Sidebar';
+import {useDocuments} from './contexts/DocumentContext';
 
 import {DockviewReact, DockviewReadyEvent, IDockviewApi, PanelCollection, SerializedDockview} from 'dockview';
 import 'dockview/dist/styles/dockview.css';
@@ -30,21 +30,20 @@ interface Document {
 }
 
 function App() {
-    // State for documents and UI
-    const [documents, setDocuments] = useState<Document[]>(loadDocumentsFromStorage());
-    const [activeDoc, setActiveDoc] = useState<Document | null>(null);
+    // Use the document context instead of managing documents locally
+    const {
+        documents,
+        activeDocument: activeDoc,
+        updateDocument,
+        createDocument: createContextDocument,
+        openDocument: openContextDocument,
+        saveDocument,
+        closeDocument
+    } = useDocuments();
+
     const [isDarkMode, setIsDarkMode] = useState(false);
     const [dockviewApi, setDockviewApi] = useState<IDockviewApi | null>(null);
     const [savedLayout, setSavedLayout] = useState<SerializedDockview | undefined>(loadLayoutFromStorage());
-
-    // Save documents to localStorage whenever they change
-    useEffect(() => {
-        try {
-            localStorage.setItem('engineer-notepad-docs', JSON.stringify(documents));
-        } catch (e) {
-            console.error('Error saving documents to localStorage:', e);
-        }
-    }, [documents]);
 
     // Save layout to localStorage whenever it changes
     const saveLayout = () => {
@@ -58,60 +57,25 @@ function App() {
         }
     };
 
-    // Create a new document
+    // Create a new document - wrapper around context function
     const createDocument = (type: DocType) => {
-        const newDoc: Document = {
-            id: Date.now().toString(),
-            title: `Untitled ${type.charAt(0).toUpperCase() + type.slice(1)}`,
-            content: '',
-            type,
-            createdAt: new Date(),
-            updatedAt: new Date()
-        };
-
-        setDocuments([...documents, newDoc]);
-        setActiveDoc(newDoc);
-
-        // Open the document in the editor
-        if (dockviewApi) {
-            dockviewApi.addPanel({
-                id: `editor-${newDoc.id}`,
-                component: 'documentEditor',
-                params: {
-                    document: newDoc,
-                    onUpdate: (content: string) => updateDocument(newDoc.id, content)
-                },
-                title: newDoc.title
-            });
-        }
-    };
-
-    // Update document content
-    const updateDocument = (id: string, content: string) => {
-        const docToUpdate = documents.find(doc => doc.id === id);
-        if (!docToUpdate) return;
-
-        const updatedDoc = {
-            ...docToUpdate,
-            content,
-            updatedAt: new Date()
-        };
-
-        setDocuments(documents.map(doc =>
-            doc.id === id ? updatedDoc : doc
-        ));
-
-        if (activeDoc?.id === id) {
-            setActiveDoc(updatedDoc);
-        }
-
-        // Update panel title if it exists
-        if (dockviewApi) {
-            const panel = dockviewApi.getPanel(`editor-${id}`);
-            if (panel) {
-                panel.setTitle(updatedDoc.title);
+        createContextDocument(type).then(id => {
+            // Open the document in the editor
+            if (dockviewApi) {
+                const newDoc = documents.find(doc => doc.id === id);
+                if (newDoc) {
+                    dockviewApi.addPanel({
+                        id: `editor-${id}`,
+                        component: 'documentEditor',
+                        params: {
+                            document: newDoc,
+                            onUpdate: (content: string) => updateDocument(id, content)
+                        },
+                        title: newDoc.title
+                    });
+                }
             }
-        }
+        });
     };
 
     // Update document title
@@ -124,10 +88,7 @@ function App() {
             updatedAt: new Date()
         };
 
-        setActiveDoc(updatedDoc);
-        setDocuments(documents.map(doc =>
-            doc.id === activeDoc.id ? updatedDoc : doc
-        ));
+        saveDocument(updatedDoc);
 
         // Update panel title if it exists
         if (dockviewApi) {
@@ -139,12 +100,8 @@ function App() {
     };
 
     // Delete a document
-    const deleteDocument = (id: string) => {
-        setDocuments(documents.filter(doc => doc.id !== id));
-
-        if (activeDoc && activeDoc.id === id) {
-            setActiveDoc(null);
-        }
+    const deleteDocument = (id: number) => {
+        closeDocument(id);
 
         // Close related panels if they exist
         if (dockviewApi) {
@@ -201,9 +158,9 @@ function App() {
         }
     };
 
-    // Open document in editor
+    // Open document in editor - wrapper around context function
     const openDocument = (doc: Document) => {
-        setActiveDoc(doc);
+        openContextDocument(doc.id!);
 
         // Check if document is already open in editor
         if (dockviewApi) {
@@ -217,7 +174,7 @@ function App() {
                     component: 'documentEditor',
                     params: {
                         document: doc,
-                        onUpdate: (content: string) => updateDocument(doc.id, content)
+                        onUpdate: (content: string) => updateDocument(doc.id!, content)
                     },
                     title: doc.title
                 });
@@ -241,7 +198,10 @@ function App() {
             const panelConfig: any = {
                 id: previewPanelId,
                 component: 'documentPreview',
-                params: {document: activeDoc},
+                params: {
+                    document: activeDoc,
+                    onUpdate: (content: string) => updateDocument(doc.id!, content)
+                },
                 title: `Preview: ${activeDoc.title}`
             };
 
@@ -304,6 +264,25 @@ function App() {
         // If we have a saved layout, restore it
         if (savedLayout) {
             try {
+                const panelKeys = Object.keys(savedLayout.panels);
+                for (const panelKey of panelKeys) {
+                    const panelObject = savedLayout.panels[panelKey];
+                    if (!panelObject.params){
+                        panelObject.params = {};
+                    }
+
+                    // Create a reference to the document ID instead of the document itself
+                    const docId = panelObject.params.document?.id;
+                    if (docId) {
+                        // Use the updateDocument function directly without capturing it in a closure
+                        panelObject.params["onUpdate"] = ((panelObject) => {
+                            return (content: string) => {
+                                console.log("on update from layout", panelObject.params, content);
+                                updateDocument(panelObject.params.document.id, content);
+                            }
+                        })(panelObject);
+                    }
+                }
                 event.api.fromJSON(savedLayout);
             } catch (e) {
                 console.error('Error restoring layout:', e);
@@ -312,7 +291,6 @@ function App() {
         } else {
             initializeDefaultLayout(event.api);
         }
-
         // Save layout when panels are moved or resized
         event.api.onDidLayoutChange(() => {
             saveLayout();
@@ -328,18 +306,15 @@ function App() {
                 component: 'documentEditor',
                 params: {
                     document: activeDoc,
-                    onUpdate: (content: string) => updateDocument(activeDoc.id, content)
+                    onUpdate: (content: string) => {
+                        console.log("on update", content);
+                        updateDocument(activeDoc.id!, content);
+                    }
                 },
                 title: activeDoc.title
             });
         }
     };
-
-    // Update properties panel when active document changes
-    useEffect(() => {
-        // This useEffect is no longer needed as the Sidebar component handles these panels
-        // The Sidebar component receives the updated props directly
-    }, [activeDoc, documents, dockviewApi]);
 
     // Render the UI
     return (
