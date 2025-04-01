@@ -19,6 +19,7 @@
     "@codemirror/language-data": "^6.5.1",
     "@codemirror/state": "^6.5.2",
     "@codemirror/view": "^6.36.5",
+    "@tailwindcss/vite": "^4.1.0",
     "dexie": "^4.0.11",
     "dockview": "^4.2.1",
     "dockview-core": "^4.2.1",
