@@ -15,6 +15,7 @@ import PropertiesPanel from './components/Properties/PropertiesPanel';
 import {CustomGroupPanel, CustomWatermarkPanel} from './components/Panels/CustomPanels';
 // Helper functions
 import {loadDocumentsFromStorage, loadLayoutFromStorage} from './utils/storage';
+import * as StorageService from './services/storage';
 import 'remixicon/fonts/remixicon.css';
 
 // Types for our document system
@@ -103,16 +104,35 @@ function App() {
     const deleteDocument = (id: number) => {
         closeDocument(id);
 
+        // Delete the document from storage
+        StorageService.deleteDocument(id)
+            .then(() => {
+                console.log(`Document ${id} deleted successfully`);
+            })
+            .catch(error => {
+                console.error(`Error deleting document ${id}:`, error);
+            });
+
         // Close related panels if they exist
         if (dockviewApi) {
-            const editorPanel = dockviewApi.getPanel(`editor-${id}`);
-            if (editorPanel) {
-                editorPanel.close();
-            }
-
-            const previewPanel = dockviewApi.getPanel(`preview-${id}`);
-            if (previewPanel) {
-                previewPanel.close();
+            try {
+                // Instead of trying to remove panels directly, let's get all groups and panels
+                const groups = dockviewApi.groups;
+                
+                // Iterate through all groups to find and close panels by ID
+                groups.forEach(group => {
+                    const panels = group.panels;
+                    
+                    // Look for editor and preview panels for this document
+                    panels.forEach(panel => {
+                        if (panel.id === `editor-${id}` || panel.id === `preview-${id}`) {
+                            // Use the panel's close method which is safer
+                            panel.close();
+                        }
+                    });
+                });
+            } catch (error) {
+                console.error(`Error removing panels for document ${id}:`, error);
             }
         }
     };
