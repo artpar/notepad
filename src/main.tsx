@@ -4,9 +4,12 @@ import './index.css'
 import './styles.css'
 import './App.css'
 import App from './App.tsx'
+import { SettingsProvider } from './contexts/SettingsContext'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <SettingsProvider>
+      <App />
+    </SettingsProvider>
   </StrictMode>,
 )

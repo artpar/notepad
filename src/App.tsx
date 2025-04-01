@@ -1,19 +1,22 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+// src/App.tsx
+import { useState, useEffect, useMemo } from 'react';
 import './App.css';
 
 import {
   DockviewReact,
   DockviewReadyEvent,
-  IDockviewPanelProps,
   IDockviewApi,
-  IGroupPanelProps,
-  IWatermarkPanelProps,
   PanelCollection,
-  SerializedDockview,
-  DockviewGroupPanel
+  SerializedDockview
 } from 'dockview';
 import 'dockview/dist/styles/dockview.css';
 
+// Import components
+import DocumentEditorPanel from './components/Editor/DocumentEditorPanel';
+import DocumentPreviewPanel from './components/Preview/DocumentPreviewPanel';
+import ExplorerPanel from './components/Explorer/ExplorerPanel';
+import PropertiesPanel from './components/Properties/PropertiesPanel';
+import { CustomGroupPanel, CustomWatermarkPanel } from './components/Panels/CustomPanels';
 
 // Types for our document system
 type DocType = 'text' | 'markdown' | 'javascript' | 'python' | 'html';
@@ -27,200 +30,8 @@ interface Document {
   updatedAt: Date;
 }
 
-// Helper function to load documents from localStorage
-const loadDocumentsFromStorage = (): Document[] => {
-  try {
-    const savedDocs = localStorage.getItem('engineer-notepad-docs');
-    if (savedDocs) {
-      return JSON.parse(savedDocs).map((doc: any) => ({
-        ...doc,
-        createdAt: new Date(doc.createdAt),
-        updatedAt: new Date(doc.updatedAt)
-      }));
-    }
-  } catch (e) {
-    console.error('Error loading documents from localStorage:', e);
-  }
-  return [];
-};
-
-// Helper function to load layout from localStorage
-const loadLayoutFromStorage = (): SerializedDockview | undefined => {
-  try {
-    const savedLayout = localStorage.getItem('engineer-notepad-layout');
-    if (savedLayout) {
-      return JSON.parse(savedLayout);
-    }
-  } catch (e) {
-    console.error('Error loading layout from localStorage:', e);
-  }
-  return undefined;
-};
-
-// Document Editor Panel Component
-const DocumentEditorPanel: React.FC<IDockviewPanelProps<{ document: Document, onUpdate: (content: string) => void }>> = (props) => {
-  const { params } = props;
-  const { document, onUpdate } = params;
-  const editorRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    if (editorRef.current) {
-      editorRef.current.focus();
-    }
-  }, []);
-
-  return (
-    <div className="editor-container">
-      <textarea
-        ref={editorRef}
-        value={document.content}
-        onChange={(e) => onUpdate(e.target.value)}
-        className={`editor-textarea ${document.type}`}
-        placeholder="Start typing here..."
-      />
-    </div>
-  );
-};
-
-// Document Preview Panel Component
-const DocumentPreviewPanel: React.FC<IDockviewPanelProps<{ document: Document }>> = (props) => {
-  const { params } = props;
-  const { document } = params;
-
-  // Simple preview rendering based on document type
-  const renderPreview = () => {
-    switch (document.type) {
-      case 'markdown':
-        return <div className="preview markdown-preview" dangerouslySetInnerHTML={{ __html: document.content }} />;
-      case 'html':
-        return <iframe srcDoc={document.content} className="preview html-preview" />;
-      default:
-        return <pre className="preview text-preview">{document.content}</pre>;
-    }
-  };
-
-  return (
-    <div className="preview-container">
-      <div className="preview-header">
-        <h3>Preview: {document.title}</h3>
-      </div>
-      <div className="preview-content">
-        {renderPreview()}
-      </div>
-    </div>
-  );
-};
-
-// Explorer Panel Component
-const ExplorerPanel: React.FC<IDockviewPanelProps<{
-  documents: Document[],
-  onSelectDocument: (doc: Document) => void,
-  onCreateDocument: (type: DocType) => void,
-  onDeleteDocument: (id: string) => void
-}>> = (props) => {
-  const { params } = props;
-  const { documents, onSelectDocument, onCreateDocument, onDeleteDocument } = params;
-
-  return (
-    <div className="explorer-container">
-      <div className="explorer-header">
-        <h3>Documents</h3>
-        <div className="new-doc-dropdown">
-          <button className="new-doc-button">New +</button>
-          <div className="dropdown-content">
-            <button onClick={() => onCreateDocument('text')}>Text File</button>
-            <button onClick={() => onCreateDocument('markdown')}>Markdown</button>
-            <button onClick={() => onCreateDocument('javascript')}>JavaScript</button>
-            <button onClick={() => onCreateDocument('python')}>Python</button>
-            <button onClick={() => onCreateDocument('html')}>HTML</button>
-          </div>
-        </div>
-      </div>
-      
-      <div className="documents-list">
-        {documents.length === 0 ? (
-          <p className="no-docs">No documents yet. Create one to get started!</p>
-        ) : (
-          documents.map(doc => (
-            <div 
-              key={doc.id} 
-              className="document-item"
-              onClick={() => onSelectDocument(doc)}
-            >
-              <span className="doc-title">{doc.title}</span>
-              <span className="doc-type">{doc.type}</span>
-              <button 
-                className="delete-button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (confirm('Are you sure you want to delete this document?')) {
-                    onDeleteDocument(doc.id);
-                  }
-                }}
-              >
-                ×
-              </button>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-};
-
-// Properties Panel Component
-const PropertiesPanel: React.FC<IDockviewPanelProps<{
-  document: Document | null,
-  onUpdateTitle: (title: string) => void
-}>> = (props) => {
-  const { params } = props;
-  const { document, onUpdateTitle } = params;
-
-  if (!document) {
-    return <div className="properties-container empty">No document selected</div>;
-  }
-
-  return (
-    <div className="properties-container">
-      <div className="property-group">
-        <label>Title</label>
-        <input
-          type="text"
-          value={document.title}
-          onChange={(e) => onUpdateTitle(e.target.value)}
-          className="property-input"
-        />
-      </div>
-      <div className="property-group">
-        <label>Type</label>
-        <div className="property-value">{document.type}</div>
-      </div>
-      <div className="property-group">
-        <label>Created</label>
-        <div className="property-value">{document.createdAt.toLocaleString()}</div>
-      </div>
-      <div className="property-group">
-        <label>Modified</label>
-        <div className="property-value">{document.updatedAt.toLocaleString()}</div>
-      </div>
-    </div>
-  );
-};
-
-// Custom Group Panel
-const CustomGroupPanel: React.FC<IGroupPanelProps> = (props) => {
-  return <DockviewGroupPanel {...props} />;
-};
-
-// Custom Watermark Panel
-const CustomWatermarkPanel: React.FC<IWatermarkPanelProps> = (props) => {
-  return (
-    <div className="welcome-screen">
-      <h2>Welcome to Engineer's Notepad</h2>
-      <p>Select a document from the Explorer or create a new one to get started.</p>
-    </div>
-  );
-};
+// Helper functions
+import { loadDocumentsFromStorage, loadLayoutFromStorage } from './utils/storage';
 
 function App() {
   // State for documents and UI
