@@ -1,6 +1,8 @@
 // src/App.tsx
 import { useState, useEffect, useMemo } from 'react';
 import './App.css';
+import Sidebar from './components/UI/Sidebar';
+
 
 import {
   DockviewReact,
@@ -411,7 +413,16 @@ function App() {
         </div>
       </header>
 
-      <div className="app-content">
+      <div className="app-content flex">
+      <Sidebar
+        documents={documents}
+        activeDoc={activeDoc}
+        onSelectDocument={openDocument}
+        onCreateDocument={createDocument}
+        onDeleteDocument={deleteDocument}
+        onUpdateTitle={updateDocumentTitle}
+      />
+      <div className="flex-grow">
         <DockviewReact
           components={components}
           onReady={handleDockviewReady}
@@ -420,6 +431,7 @@ function App() {
           className="dockview-theme-light"
         />
       </div>
+    </div>
 
       <footer className="app-footer">
         <p>Engineer's Notepad | Keyboard Shortcuts: Ctrl+S (Save Layout), Ctrl+P (Preview), Ctrl+N (New), Ctrl+E (Export)</p>

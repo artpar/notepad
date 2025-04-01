@@ -20,11 +20,11 @@ interface CodeEditorProps {
   readOnly?: boolean;
 }
 
-const CodeEditor: React.FC<CodeEditorProps> = ({ 
-  content, 
-  language, 
-  onChange, 
-  readOnly = false 
+const CodeEditor: React.FC<CodeEditorProps> = ({
+  content,
+  language,
+  onChange,
+  readOnly = false
 }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -111,6 +111,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
       parent: editorRef.current
     });
 
+
     viewRef.current = view;
 
     return () => {
@@ -131,10 +132,10 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
   }, [content]);
 
   return (
-    <div className="h-full w-full">
-      <div 
-        ref={editorRef} 
-        className="h-full w-full overflow-auto"
+    <div className="flex flex-1 h-full w-full">
+      <div
+        ref={editorRef}
+        className="h-full  h-max w-full overflow-auto"
         style={{
           backgroundColor: currentTheme.isDark ? '#1e1e1e' : '#ffffff',
           color: currentTheme.isDark ? '#d4d4d4' : '#333333',
