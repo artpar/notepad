@@ -147,9 +147,9 @@ const Sidebar: React.FC<SidebarProps> = ({
         if (!docs || docs.length === 0) return null;
 
         return (
-            <div className="mb-4">
+            <div className="mb-4 p-2">
                 <h3 className="text-xs uppercase font-semibold tracking-wide mb-2 px-3 opacity-70">{title}</h3>
-                <div className="space-y-1">
+                <div className="space-y-2 p-2">
                     {docs.map((doc) => (
                         <DocumentItem
                             key={doc.id}
@@ -258,17 +258,6 @@ const Sidebar: React.FC<SidebarProps> = ({
 
                 {/* Create new document button - always visible */}
                 <div className="p-3 relative">
-                    <button
-                        className="w-full px-3 py-2 rounded-md flex items-center justify-center text-sm transition-colors"
-                        style={{
-                            backgroundColor: currentTheme.colors.accent,
-                            color: '#fff'
-                        }}
-                        onClick={() => setCreateMenuOpen(!createMenuOpen)}
-                    >
-                        <i className="ri-add-line mr-2"></i>
-                        Create New Document
-                    </button>
 
                     {/* Create document dropdown */}
                     <AnimatePresence>
