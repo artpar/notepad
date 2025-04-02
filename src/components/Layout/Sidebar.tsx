@@ -334,51 +334,6 @@ const Sidebar: React.FC<SidebarProps> = ({onToggleSidebar}) => {
                 onClose={closeContextMenu}
             />
 
-            {/* Sidebar header */}
-            <div className="p-3 flex justify-between items-center border-b"
-                 style={{borderColor: currentTheme.colors.border}}
-            >
-                <div className="flex items-center">
-                    <i className="ri-book-2-line text-xl mr-2" style={{color: currentTheme.colors.accent}}></i>
-                    <span className="font-semibold">Engineer's Notes</span>
-                </div>
-                <div className="flex">
-                    <button
-                        className="p-1.5 rounded-full hover:bg-opacity-20 hover:bg-gray-500"
-                        onClick={onToggleSidebar}
-                        title="Hide Sidebar"
-                        style={{color: currentTheme.colors.sidebarText}}
-                    >
-                        <i className="ri-arrow-left-s-line text-lg"></i>
-                    </button>
-                </div>
-            </div>
-
-            {/* Sidebar tabs */}
-            <div className="flex border-b" style={{borderColor: currentTheme.colors.border}}>
-                <button
-                    className={`flex-1 p-2 text-center transition-colors ${activeTab === SidebarTab.Files ? 'border-b-2' : ''}`}
-                    style={{
-                        borderColor: activeTab === SidebarTab.Files ? currentTheme.colors.accent : 'transparent',
-                        backgroundColor: activeTab === SidebarTab.Files ? `${currentTheme.colors.accent}20` : 'transparent',
-                        color: currentTheme.colors.sidebarText
-                    }}
-                    onClick={() => setActiveTab(SidebarTab.Files)}
-                >
-                    <i className="ri-folder-line mr-1"></i>Files
-                </button>
-                <button
-                    className={`flex-1 p-2 text-center transition-colors ${activeTab === SidebarTab.Search ? 'border-b-2' : ''}`}
-                    style={{
-                        borderColor: activeTab === SidebarTab.Search ? currentTheme.colors.accent : 'transparent',
-                        backgroundColor: activeTab === SidebarTab.Search ? `${currentTheme.colors.accent}20` : 'transparent',
-                        color: currentTheme.colors.sidebarText
-                    }}
-                    onClick={() => setActiveTab(SidebarTab.Search)}
-                >
-                    <i className="ri-search-line mr-1"></i>Search
-                </button>
-            </div>
 
             {/* Search input - shown for both tabs */}
             <div className="p-2 border-b" style={{borderColor: currentTheme.colors.border}}>
@@ -467,37 +422,6 @@ const Sidebar: React.FC<SidebarProps> = ({onToggleSidebar}) => {
                             </button>
                         ))}
                     </div>
-                </div>
-            )}
-
-            {/* Filter tags */}
-            {tags.length > 0 && (
-                <div className="px-3 py-2 border-b flex flex-wrap gap-1"
-                     style={{borderColor: currentTheme.colors.border}}>
-                    <button
-                        className={`text-xs px-2 py-1 rounded-full ${filterTag === null ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'}`}
-                        onClick={() => setFilterTag(null)}
-                    >
-                        All
-                    </button>
-                    {tags.slice(0, 10).map(tag => (
-                        <button
-                            key={tag}
-                            className={`text-xs px-2 py-1 rounded-full ${filterTag === tag ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'}`}
-                            onClick={() => setFilterTag(tag === filterTag ? null : tag)}
-                        >
-                            {tag}
-                        </button>
-                    ))}
-                    {tags.length > 10 && (
-                        <button
-                            className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200"
-                            onClick={() => {/* Show all tags */
-                            }}
-                        >
-                            +{tags.length - 10} more
-                        </button>
-                    )}
                 </div>
             )}
 

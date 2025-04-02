@@ -22,8 +22,8 @@ import ConfirmationModal from './components/UI/ConfirmationModal';
 import ContextMenu, {ContextMenuItem} from './components/UI/ContextMenu';
 
 // Import services and utils
-import {loadLayoutFromStorage} from './utils/storage';
 import * as StorageService from './services/storage';
+import * as LayoutService from './services/layoutService';
 import ToastProvider, {useToast} from "./components/UI/ToastSystem.tsx";
 import DocumentSearch from "./components/Search/DocumentSearch.tsx";
 import Welcome from "./components/UI/Welcome.tsx";
@@ -53,7 +53,7 @@ function AppContent() {
 
     const {currentTheme} = useSettings();
     const [dockviewApi, setDockviewApi] = useState<IDockviewApi | null>(null);
-    const [savedLayout, setSavedLayout] = useState<SerializedDockview | undefined>(loadLayoutFromStorage());
+    const [savedLayout, setSavedLayout] = useState<SerializedDockview | undefined>(LayoutService.loadLayout());
     const [showSidebar, setShowSidebar] = useState(true);
     const [isLoading, setIsLoading] = useState(true);
     const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
@@ -449,17 +449,23 @@ function AppContent() {
                         panelObject.params = {};
                     }
 
-                    // Create a reference to the document ID instead of the document itself
-                    const docId = panelObject.params.document?.id;
+                    // Get the document ID from the layout
+                    const docId = panelObject.params.documentId || panelObject.params.document?.id;
                     if (docId) {
-                        // Use the updateDocument function directly without capturing it in a closure
+                        // Fetch the latest document from the database
                         const doc = await StorageService.getDocument(docId);
-                        panelObject.params.document = doc;
-                        panelObject.params["onUpdate"] = ((panelObject) => {
-                            return (content: string) => {
-                                updateDocument(panelObject.params.document.id, content);
-                            }
-                        })(panelObject);
+                        if (doc) {
+                            // Add the document to the panel params
+                            panelObject.params.document = doc;
+                            // Set up the update function
+                            panelObject.params.onUpdate = (content: string) => {
+                                updateDocument(docId, content);
+                            };
+                        } else {
+                            console.warn(`Document with ID ${docId} not found in database`);
+                            // Remove this panel if the document doesn't exist anymore
+                            delete savedLayout.panels[panelKey];
+                        }
                     }
                 }
                 event.api.fromJSON(savedLayout);
@@ -473,7 +479,10 @@ function AppContent() {
 
         // Save layout when panels are moved or resized
         event.api.onDidLayoutChange(() => {
-            saveLayoutRef.current();
+            // Only save layout, not documents
+            LayoutService.saveLayout(event.api).catch(error => {
+                console.error('Error auto-saving layout on change:', error);
+            });
         });
 
         // Set loading to false once everything is initialized
@@ -493,9 +502,8 @@ function AppContent() {
         if (dockviewApi) {
             saveLayoutRef.current = () => {
                 try {
-                    const layout = dockviewApi.toJSON();
-                    localStorage.setItem('engineer-notepad-layout', JSON.stringify(layout));
-
+                    LayoutService.saveLayout(dockviewApi);
+                    
                     // Show success toast when layout is explicitly saved (not auto-saved)
                     showToast('Layout saved successfully', {
                         type: 'success',
