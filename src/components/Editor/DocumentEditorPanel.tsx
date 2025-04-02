@@ -13,7 +13,6 @@ const DocumentEditorPanel: React.FC<IDockviewPanelProps<DocumentEditorPanelProps
     const {params} = props;
     const {document, onUpdate} = params;
 
-    console.log("DocumentEditorPanel", document.id, document.content)
     // Handle content updates
     const handleContentChange = (content: string) => {
         if (typeof onUpdate === 'function') {

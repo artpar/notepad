@@ -186,6 +186,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const saveDocument = async (document: Document): Promise<void> => {
     if (!document.id) return;
+    console.log("Saving document", document.id)
 
     const docId = document.id;
 

@@ -48,7 +48,8 @@ function AppContent() {
         createDocument: createContextDocument,
         openDocument: openContextDocument,
         saveDocument,
-        closeDocument
+        closeDocument,
+        documentStates
     } = useDocuments();
 
     const {currentTheme} = useSettings();
@@ -500,8 +501,22 @@ function AppContent() {
     // Setup save layout function reference
     useEffect(() => {
         if (dockviewApi) {
-            saveLayoutRef.current = () => {
+            saveLayoutRef.current = async () => {
                 try {
+                    // First save all dirty documents
+                    const dirtyDocIds = Object.entries(documentStates)
+                        .filter(([, state]) => state.isDirty)
+                        .map(([id]) => parseInt(id));
+                    
+                    // Save each dirty document
+                    for (const id of dirtyDocIds) {
+                        const doc = documents.find(d => d.id === id);
+                        if (doc) {
+                            await saveDocument(doc);
+                        }
+                    }
+                    
+                    // Then save the layout
                     LayoutService.saveLayout(dockviewApi);
                     
                     // Show success toast when layout is explicitly saved (not auto-saved)
@@ -515,7 +530,7 @@ function AppContent() {
                 }
             };
         }
-    }, [dockviewApi, showToast]);
+    }, [dockviewApi, showToast, documents, documentStates, saveDocument]);
 
     // Handle keyboard shortcuts
     useEffect(() => {
