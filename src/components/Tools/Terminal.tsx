@@ -2,10 +2,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { IDockviewPanelProps } from 'dockview';
 import { useSettings } from '../../contexts/SettingsContext';
-import { useDocuments } from '../../contexts/DocumentContext';
 import { Document } from '../../types/document';
 import { useToast } from '../UI/ToastSystem';
 import 'remixicon/fonts/remixicon.css';
+import {useDocuments} from "../../contexts/UseDocuments.tsx";
 
 interface TerminalPanelProps {
   document?: Document;
@@ -109,7 +109,7 @@ Type 'help' to see available commands.`,
           const doc = documents.find(d => d.id === docId);
 
           if (doc) {
-            openDocument(docId);
+            openDocument(parseInt(docId));
             output = `Opened document: ${doc.title}`;
           } else {
             output = `Error: Document with ID ${docId} not found`;

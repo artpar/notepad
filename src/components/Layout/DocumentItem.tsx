@@ -9,6 +9,7 @@ interface DocumentItemProps {
   document: Document;
   isActive: boolean;
   onClick: () => void;
+  onDelete: (e) => any;
   onContextMenu?: (e: React.MouseEvent) => void;
   viewMode?: 'list' | 'grid';
   highlightText?: string;
@@ -19,6 +20,7 @@ const DocumentItem: React.FC<DocumentItemProps> = memo(({
   document,
   isActive,
   onClick,
+  onDelete,
   onContextMenu,
   viewMode = 'list',
   highlightText
@@ -53,12 +55,12 @@ const DocumentItem: React.FC<DocumentItemProps> = memo(({
 
       return parts.map((part, i) =>
         regex.test(part) ? (
-          <span 
-            key={i} 
-            style={{ 
-              backgroundColor: `${currentTheme.colors.accent}40`, 
-              padding: '0 2px', 
-              borderRadius: '2px' 
+          <span
+            key={i}
+            style={{
+              backgroundColor: `${currentTheme.colors.accent}40`,
+              padding: '0 2px',
+              borderRadius: '2px'
             }}
           >
             {part}
@@ -102,21 +104,21 @@ const DocumentItem: React.FC<DocumentItemProps> = memo(({
               backgroundColor: currentTheme.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'
             }}
           >
-            <i 
-              className={getDocumentIcon(document.type, document.language)} 
+            <i
+              className={getDocumentIcon(document.type, document.language)}
               style={{color: currentTheme.colors.accent}}
             />
           </div>
         </div>
-        
+
         <h4
           className="font-medium truncate"
           style={{color: isActive ? currentTheme.colors.accent : currentTheme.colors.sidebarText}}
         >
           {highlightText ? highlightMatchingText(document.title) : document.title}
         </h4>
-        
-        <div 
+
+        <div
           className="mt-1 text-xs flex items-center"
           style={{color: currentTheme.isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)'}}
         >
@@ -155,8 +157,8 @@ const DocumentItem: React.FC<DocumentItemProps> = memo(({
         >
           {highlightText ? highlightMatchingText(document.title) : document.title}
         </div>
-        <div 
-          className="flex text-xs" 
+        <div
+          className="flex text-xs"
           style={{color: currentTheme.isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'}}
         >
           <span>{getDocumentTypeDisplay(document)}</span>

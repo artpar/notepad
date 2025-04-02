@@ -28,12 +28,12 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             // Return a placeholder or loading state if document is not available
             return <div className="h-full flex items-center justify-center">Loading document...</div>;
         }
-        
+
         // Ensure document.content is always treated as a string
         // This prevents issues when content might be null or undefined during saving
         const content = document.content || '';
-        
-        switch (document.type) {
+
+        switch (document.type.type) {
             case 'markdown':
                 return (<MarkdownEditor
                         content={content}
@@ -52,7 +52,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             default:
                 return (<CodeEditor
                         content={content}
-                        language={document.type === 'html' ? 'html' : document.language || 'plaintext'}
+                        language={document.type.type === 'html' ? 'html' : document.language || 'plaintext'}
                         onChange={handleContentChange}
                         readOnly={readOnly}
                     />);
@@ -75,7 +75,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
     // Auto-save functionality
     useEffect(() => {
-        let autoSaveInterval: NodeJS.Timeout;
+        let autoSaveInterval: any;
 
         if (settings.editor.autoSave && !readOnly) {
             autoSaveInterval = setInterval(() => {
@@ -117,7 +117,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
                     }}
                 >
                     <div>
-                        {document.type.charAt(0).toUpperCase() + document.type.slice(1)}
+                        {document.type.type.charAt(0).toUpperCase() + document.type.type.slice(1)}
                         {document.language && ` • ${document.language}`}
                     </div>
 

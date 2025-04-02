@@ -38,7 +38,7 @@ const DocumentSearch: React.FC<DocumentSearchProps> = ({
             return (
                 doc.title.toLowerCase().includes(lowerSearchTerm) ||
                 doc.content.toLowerCase().includes(lowerSearchTerm) ||
-                doc.type.toLowerCase().includes(lowerSearchTerm) ||
+                doc.type.type.toLowerCase().includes(lowerSearchTerm) ||
                 (doc.language && doc.language.toLowerCase().includes(lowerSearchTerm)) ||
                 (doc.tags && doc.tags.some(tag => tag.toLowerCase().includes(lowerSearchTerm)))
             );
@@ -113,7 +113,7 @@ const DocumentSearch: React.FC<DocumentSearchProps> = ({
 
     // Helper function to get file icon based on document type
     const getDocumentIcon = (doc: Document): string => {
-        switch (doc.type) {
+        switch (doc.type.type) {
             case 'markdown':
                 return 'ri-markdown-line';
             case 'javascript':
@@ -220,7 +220,7 @@ const DocumentSearch: React.FC<DocumentSearchProps> = ({
                                             <div className="flex-1 min-w-0">
                                                 <div className="font-medium truncate">{highlightMatch(doc.title)}</div>
                                                 <div className="text-sm opacity-60 flex items-center">
-                                                    <span className="capitalize">{doc.type}</span>
+                                                    <span className="capitalize">{doc.type.type}</span>
                                                     {doc.language && <span className="mx-1">• {doc.language}</span>}
                                                     <span className="mx-1">• {new Date(doc.updatedAt).toLocaleDateString()}</span>
                                                 </div>

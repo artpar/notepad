@@ -1,4 +1,6 @@
 // src/types/document.ts
+import {DocumentType} from "./DocumentType.tsx";
+
 export type CodeLanguage =
     'javascript'
     | 'typescript'
@@ -6,6 +8,18 @@ export type CodeLanguage =
     | 'html'
     | 'css'
     | 'java'
+    | 'c'
+    | 'csharp'
+    | 'go'
+    | 'cpp'
+    | 'rust'
+    | 'ruby'
+    | 'php'
+    | 'json'
+    | 'yaml'
+    | 'sql'
+    | 'bash'
+    | 'powershell'
     | 'text'
     | 'code'
     | 'markdown'
@@ -15,9 +29,9 @@ export type CodeLanguage =
 export type DocType = 'text' | 'markdown' | 'richtext' | 'code' | 'html';
 
 export interface Document {
-    id?: string;
+    id: string;
     title: string;
-    type: DocType;
+    type: DocumentType;
     language?: CodeLanguage;
     content: string;
     createdAt: Date;
@@ -44,25 +58,25 @@ export interface TabInfo {
 
 export const DEFAULT_DOCUMENT_TEMPLATES: Record<DocType, (title: string) => Partial<Document>> = {
     text: (title) => ({
-        title, type: 'text', content: '',
+        title, type: {type: 'text'} as DocumentType, content: '',
     }), markdown: (title) => ({
-        title, type: 'markdown', content: `# ${title}\n\n## Introduction\n\nStart writing here...\n`,
+        title, type: {type: 'markdown'} as DocumentType, content: `# ${title}\n\n## Introduction\n\nStart writing here...\n`,
     }), richtext: (title) => ({
-        title, type: 'richtext', content: `<h1>${title}</h1><p>Start writing here...</p>`,
+        title, type: {type: 'richtext'} as DocumentType, content: `<h1>${title}</h1><p>Start writing here...</p>`,
     }), code: (title) => ({
-        title, type: 'code', language: 'javascript', content: '// Start coding here\n\n',
+        title, type: {type: 'code'} as DocumentType, language: 'javascript', content: '// Start coding here\n\n',
     }), html: (title) => ({
         title,
-        type: 'html',
+        type: {type: 'html'} as DocumentType,
         content: `<!DOCTYPE html>\n<html>\n<head>\n  <title>${title}</title>\n  <style>\n    /* Add your styles here */\n  </style>\n</head>\n<body>\n  <h1>${title}</h1>\n  <p>Your content here</p>\n\n  <script>\n    // Add your JavaScript here\n  </script>\n</body>\n</html>`,
     }),
 };
 
-export const getDocumentTypeIcon = (type: DocType, language?: CodeLanguage): string => {
-    if (type === 'text') return 'ri-file-text-line';
-    if (type === 'markdown') return 'ri-markdown-line';
-    if (type === 'richtext') return 'ri-file-text-line';
-    if (type === 'html') return 'ri-html5-line';
+export const getDocumentTypeIcon = (type: DocumentType, language?: CodeLanguage): string => {
+    if (type.type === 'text') return 'ri-file-text-line';
+    if (type.type === 'markdown') return 'ri-markdown-line';
+    if (type.type === 'richtext') return 'ri-file-text-line';
+    if (type.type === 'html') return 'ri-html5-line';
 
     // Code icons based on language
     if (language === 'javascript') return 'ri-javascript-line';
@@ -74,6 +88,14 @@ export const getDocumentTypeIcon = (type: DocType, language?: CodeLanguage): str
 
     return 'ri-file-code-line';
 };
+
+
+export interface DocumentState {
+    isDirty: boolean;
+    isSaving: boolean;
+    lastSaved?: Date;
+}
+
 
 export interface DocumentStats {
     wordCount: number;

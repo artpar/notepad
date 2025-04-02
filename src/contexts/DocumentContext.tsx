@@ -1,8 +1,9 @@
 // src/contexts/DocumentContext.tsx
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { Document, DocumentState } from '../types/document';
-import { TabInfo } from '../types/ui';
+import React, {createContext, useCallback, useEffect, useRef, useState} from 'react';
+import {CodeLanguage, Document, DocumentState} from '../types/document';
+import {TabInfo} from '../types/ui';
 import * as StorageService from '../services/storage';
+import {DocumentType} from "../types/DocumentType.tsx";
 
 interface DocumentContextType {
   documents: Document[];
@@ -13,7 +14,7 @@ interface DocumentContextType {
   isLoading: boolean;
 
   // Actions
-  createDocument: (type: Document['type'], language?: string) => Promise<number>;
+  createDocument: (type: DocumentType, language?: string, content?: string, title?: string) => Promise<number>;
   openDocument: (id: number) => Promise<void>;
   saveDocument: (document: Document) => Promise<void>;
   closeDocument: (id: number) => Promise<void>;
@@ -26,14 +27,6 @@ interface DocumentContextType {
 }
 
 const DocumentContext = createContext<DocumentContextType | undefined>(undefined);
-
-export const useDocuments = () => {
-  const context = useContext(DocumentContext);
-  if (!context) {
-    throw new Error('useDocuments must be used within a DocumentProvider');
-  }
-  return context;
-};
 
 export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -74,7 +67,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       for (const id of dirtyDocs) {
         if (pendingSaves.current.has(id)) continue; // Skip if already saving
 
-        const doc = documents.find(d => d.id === id);
+        const doc = documents.find(d => parseInt(d.id) === id);
         if (doc) {
           await saveDocument(doc);
         }
@@ -84,15 +77,15 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return () => clearInterval(autosaveInterval);
   }, [documents, documentStates]);
 
-  const createDocument = async (type: Document['type'], language?: string): Promise<number> => {
+  const createDocument = async (type: DocumentType, language?: string, content?: string, title?: string): Promise<number> => {
     // Generate a unique title
-    const baseName = type === 'markdown' ? 'Untitled Document' :
-        type === 'javascript' ? 'Untitled Script' :
-            type === 'python' ? 'Untitled Script' :
-                type === 'html' ? 'Untitled Page' : 'Untitled';
+    const baseName = type.type === 'markdown' ? 'Untitled Document' :
+        type.type === 'javascript' ? 'Untitled Script' :
+            type.type === 'python' ? 'Untitled Script' :
+                type.type === 'html' ? 'Untitled Page' : 'Untitled';
 
     let nameCounter = 1;
-    let title = baseName;
+    title = title || baseName;
 
     // Check if the name already exists
     while (documents.some(doc => doc.title === title)) {
@@ -100,17 +93,18 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
 
     const newDoc: Document = {
+      id: "",
       title,
-      content: '',
+      content: content,
       type,
-      language: language as any,
+      language: language as CodeLanguage,
       createdAt: new Date(),
       updatedAt: new Date(),
       tags: []
     };
 
     const id = await StorageService.saveDocument(newDoc);
-    newDoc.id = id;
+    newDoc.id = id + "";
 
     setDocuments(prev => [...prev, newDoc]);
 
@@ -120,6 +114,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       id: tabId,
       title: newDoc.title,
       documentId: id,
+      isDirty: false,
       type: 'document'
     };
 
@@ -143,13 +138,13 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setActiveTabId(openTabs[existingTabIndex].id);
 
       // Find the document and set it as active
-      const doc = documents.find(d => d.id === id);
+      const doc = documents.find(d => parseInt(d.id) === id);
       if (doc) {
         setActiveDocument(doc);
       }
     } else {
       // Try to find document in memory first
-      let document = documents.find(d => d.id === id);
+      let document = documents.find(d => parseInt(d.id) === id);
 
       // If not found in memory, load from storage
       if (!document) {
@@ -157,7 +152,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         // Add to documents list if found
         if (document) {
-          setDocuments(prev => [...prev.filter(d => d.id !== id), document!]);
+          setDocuments(prev => [...prev.filter(d => parseInt(d.id) !== id), document!]);
         }
       }
 
@@ -167,7 +162,8 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           id: tabId,
           title: document.title,
           documentId: id,
-          type: 'document'
+          type: 'document',
+          isDirty: false
         };
 
         setOpenTabs(prev => [...prev, newTab]);
@@ -188,7 +184,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (!document.id) return;
     console.log("Saving document", document.id)
 
-    const docId = document.id;
+    const docId = parseInt(document.id);
 
     // Mark as saving and add to pending saves
     pendingSaves.current.add(docId);
@@ -202,7 +198,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       // Update documents list
       setDocuments(prev => {
-        const index = prev.findIndex(d => d.id === docId);
+        const index = prev.findIndex(d => parseInt(d.id) === docId);
         if (index >= 0) {
           const newDocs = [...prev];
           newDocs[index] = document;
@@ -212,7 +208,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       });
 
       // If this is the active document, update it
-      if (activeDocument?.id === docId) {
+      if (activeDocument.id && parseInt(activeDocument.id) === docId) {
         setActiveDocument(document);
       }
 
@@ -250,7 +246,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const closeDocument = async (id: number): Promise<void> => {
     // Check if document is dirty and needs saving
     if (documentStates[id]?.isDirty) {
-      const doc = documents.find(d => d.id === id);
+      const doc = documents.find(d => parseInt(d.id as string) === id);
       if (doc) {
         await saveDocument(doc);
       }
@@ -261,13 +257,13 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setOpenTabs(updatedTabs);
 
     // If the active document is being closed, set a new active document
-    if (activeDocument?.id === id) {
+    if (activeDocument && parseInt(activeDocument.id as string) === id) {
       if (updatedTabs.length > 0) {
         const lastTab = updatedTabs[updatedTabs.length - 1];
         setActiveTabId(lastTab.id);
 
         if (lastTab.documentId) {
-          const doc = documents.find(d => d.id === lastTab.documentId);
+          const doc = documents.find(d => parseInt(d.id as string) === lastTab.documentId);
           setActiveDocument(doc || null);
         } else {
           setActiveDocument(null);
@@ -295,7 +291,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     // Update the document in memory
     setDocuments(prev => {
-      const index = prev.findIndex(doc => doc.id === id);
+      const index = prev.findIndex(doc => parseInt(doc.id) === id);
       if (index >= 0) {
         const updatedDoc = {
           ...prev[index],
@@ -304,7 +300,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         };
 
         // If this is the active document, update it
-        if (activeDocument?.id === id) {
+        if (activeDocument && parseInt(activeDocument.id) === id) {
           setActiveDocument(updatedDoc);
         }
 
@@ -318,7 +314,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const updateDocumentTitle = async (id: number, title: string): Promise<void> => {
     // Find the document
-    const doc = documents.find(d => d.id === id);
+    const doc = documents.find(d => parseInt(d.id) === id);
     if (!doc) return;
 
     // Update document with new title
@@ -330,11 +326,11 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     // Update in memory immediately for responsiveness
     setDocuments(prev =>
-        prev.map(doc => doc.id === id ? updatedDoc : doc)
+        prev.map(doc => parseInt(doc.id) === id ? updatedDoc : doc)
     );
 
     // If this is the active document, update it
-    if (activeDocument?.id === id) {
+    if (activeDocument && parseInt(activeDocument.id) === id) {
       setActiveDocument(updatedDoc);
     }
 
@@ -351,7 +347,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const updateDocumentTags = async (id: number, tags: string[]): Promise<void> => {
     // Find the document
-    const doc = documents.find(d => d.id === id);
+    const doc = documents.find(d => parseInt(d.id) === id);
     if (!doc) return;
 
     // Update document with new tags
@@ -363,11 +359,11 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     // Update in memory immediately
     setDocuments(prev =>
-        prev.map(doc => doc.id === id ? updatedDoc : doc)
+        prev.map(doc => parseInt(doc.id) === id ? updatedDoc : doc)
     );
 
     // If this is the active document, update it
-    if (activeDocument?.id === id) {
+    if (activeDocument && parseInt(activeDocument.id) === id) {
       setActiveDocument(updatedDoc);
     }
 
@@ -381,7 +377,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setActiveTabId(tabId);
 
       if (tab.documentId) {
-        const doc = documents.find(d => d.id === tab.documentId);
+        const doc = documents.find(d => parseInt(d.id) === tab.documentId);
         setActiveDocument(doc || null);
       } else {
         setActiveDocument(null);
@@ -395,7 +391,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (tab && tab.documentId) {
       // Only close the tab, don't delete the document
       if (documentStates[tab.documentId]?.isDirty) {
-        const doc = documents.find(d => d.id === tab.documentId);
+        const doc = documents.find(d => parseInt(d.id) === tab.documentId);
         if (doc) {
           await saveDocument(doc);
         }
@@ -412,7 +408,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setActiveTabId(lastTab.id);
 
         if (lastTab.documentId) {
-          const doc = documents.find(d => d.id === lastTab.documentId);
+          const doc = documents.find(d => parseInt(d.id) === lastTab.documentId);
           setActiveDocument(doc || null);
         } else {
           setActiveDocument(null);

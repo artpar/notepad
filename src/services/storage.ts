@@ -1,18 +1,6 @@
 // src/services/storage.ts
 import Dexie, { Table } from 'dexie';
-
-// Define document types
-export interface Document {
-  id?: number;
-  title: string;
-  content: string;
-  type: 'text' | 'markdown' | 'code';
-  language?: string;
-  tags?: string[];
-  createdAt: Date;
-  updatedAt: Date;
-}
-
+import {Document} from "../types/document"
 export interface Snippet {
   id?: number;
   name: string;
@@ -52,7 +40,7 @@ const db = new NotepadDatabase();
 // Initialize default settings if not exists
 export const initializeSettings = async (): Promise<Settings> => {
   const settingsCount = await db.settings.count();
-  
+
   if (settingsCount === 0) {
     const defaultSettings: Settings = {
       theme: 'system',
@@ -61,21 +49,21 @@ export const initializeSettings = async (): Promise<Settings> => {
       wordWrap: true,
       autosaveInterval: 5000,
     };
-    
+
     await db.settings.add(defaultSettings);
     return defaultSettings;
   }
-  
+
   return db.settings.toCollection().first() as Promise<Settings>;
 };
 
 // Document operations
 export const saveDocument = async (document: Document): Promise<number> => {
   document.updatedAt = new Date();
-  
+
   if (document.id) {
     await db.documents.update(document.id, document);
-    return document.id;
+    return parseInt(document.id, 10);
   } else {
     document.createdAt = new Date();
     return await db.documents.add(document);
@@ -97,8 +85,8 @@ export const deleteDocument = async (id: number): Promise<void> => {
 export const searchDocuments = async (query: string): Promise<Document[]> => {
   // Simple search implementation - can be enhanced with full-text search
   return db.documents
-    .filter(doc => 
-      doc.title.toLowerCase().includes(query.toLowerCase()) || 
+    .filter(doc =>
+      doc.title.toLowerCase().includes(query.toLowerCase()) ||
       doc.content.toLowerCase().includes(query.toLowerCase())
     )
     .toArray();

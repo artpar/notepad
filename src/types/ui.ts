@@ -3,6 +3,7 @@ export interface TabInfo {
     id: string;
     title: string;
     isDirty: boolean;
+    documentId: number;
     type: string;
 }
 

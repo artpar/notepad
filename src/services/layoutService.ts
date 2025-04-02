@@ -1,5 +1,5 @@
 // src/services/layoutService.ts
-import { SerializedDockview, IDockviewApi } from 'dockview';
+import { SerializedDockview, DockviewApi } from 'dockview';
 
 const LAYOUT_STORAGE_KEY = 'engineer-notepad-layout';
 
@@ -24,17 +24,17 @@ export const loadLayout = (): SerializedDockview | undefined => {
  * @param dockviewApi The dockview API instance
  * @returns A promise that resolves when the layout is saved
  */
-export const saveLayout = (dockviewApi: IDockviewApi): Promise<void> => {
+export const saveLayout = (dockviewApi: DockviewApi): Promise<void> => {
   return new Promise((resolve, reject) => {
     try {
       // Get the layout from dockview
       const layout = dockviewApi.toJSON();
-      
+
       // Process the layout to remove document objects and only keep IDs
       if (layout.panels) {
         Object.keys(layout.panels).forEach(panelKey => {
           const panel = layout.panels[panelKey];
-          
+
           // If the panel has a document in its params, replace it with just the ID
           if (panel.params && panel.params.document) {
             const documentId = panel.params.document.id;
@@ -45,14 +45,14 @@ export const saveLayout = (dockviewApi: IDockviewApi): Promise<void> => {
               delete panel.params.document;
             }
           }
-          
+
           // Remove any callback functions that might be serialized
           if (panel.params && panel.params.onUpdate) {
             delete panel.params.onUpdate;
           }
         });
       }
-      
+
       // Save the processed layout
       localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(layout));
       resolve();

@@ -1,14 +1,7 @@
 // src/components/UI/DocumentTypeMenu.tsx
 import React from 'react';
-import { useSettings } from '../../contexts/SettingsContext';
-
-interface DocumentType {
-  type: string;
-  label: string;
-  icon: string;
-  description: string;
-  language?: string;
-}
+import {useSettings} from '../../contexts/SettingsContext';
+import {DocumentType} from "../../types/DocumentType.tsx";
 
 interface DocumentTypeMenuProps {
   onSelectType: (type: string, language?: string) => void;
@@ -16,7 +9,7 @@ interface DocumentTypeMenuProps {
 
 export const DocumentTypeMenu: React.FC<DocumentTypeMenuProps> = ({ onSelectType }) => {
   const { currentTheme } = useSettings();
-  
+
   const documentTypes: DocumentType[] = [
     {
       type: 'text',
@@ -58,7 +51,7 @@ export const DocumentTypeMenu: React.FC<DocumentTypeMenuProps> = ({ onSelectType
       <div className="p-2 border-b" style={{ borderColor: currentTheme.colors.border }}>
         <h3 className="font-medium">Create New Document</h3>
       </div>
-      
+
       <div className="py-1">
         {documentTypes.map(item => (
           <button
@@ -69,7 +62,7 @@ export const DocumentTypeMenu: React.FC<DocumentTypeMenuProps> = ({ onSelectType
             }}
             onClick={() => onSelectType(item.type, item.language)}
           >
-            <i 
+            <i
               className={`${item.icon} text-xl mt-0.5`}
               style={{ color: currentTheme.colors.accent }}
             />

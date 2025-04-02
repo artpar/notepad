@@ -1,11 +1,10 @@
 // src/App.tsx
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import './App.css';
-import {useDocuments} from './contexts/DocumentContext';
 import {useSettings} from './contexts/SettingsContext';
 import {Document} from './types/document';
 
-import {DockviewReact, DockviewReadyEvent, IDockviewApi, PanelCollection, SerializedDockview} from 'dockview';
+import {DockviewReact, DockviewReadyEvent, DockviewApi, PanelCollection, SerializedDockview} from 'dockview';
 import 'dockview/dist/styles/dockview.css';
 import 'remixicon/fonts/remixicon.css';
 import {AnimatePresence, motion} from 'framer-motion';
@@ -27,14 +26,14 @@ import * as LayoutService from './services/layoutService';
 import ToastProvider, {useToast} from "./components/UI/ToastSystem.tsx";
 import DocumentSearch from "./components/Search/DocumentSearch.tsx";
 import Welcome from "./components/UI/Welcome.tsx";
+import {useDocuments} from "./contexts/UseDocuments.tsx";
+import {DocumentType} from "./types/DocumentType.tsx";
 
 // App component wrapper with Toast provider
 const AppWithProviders = () => {
-    return (
-        <ToastProvider>
+    return (<ToastProvider>
             <AppContent/>
-        </ToastProvider>
-    );
+        </ToastProvider>);
 };
 
 // Main App content component
@@ -53,17 +52,15 @@ function AppContent() {
     } = useDocuments();
 
     const {currentTheme} = useSettings();
-    const [dockviewApi, setDockviewApi] = useState<IDockviewApi | null>(null);
+    const [dockviewApi, setDockviewApi] = useState<DockviewApi | null>(null);
     const [savedLayout, setSavedLayout] = useState<SerializedDockview | undefined>(LayoutService.loadLayout());
     const [showSidebar, setShowSidebar] = useState(true);
     const [isLoading, setIsLoading] = useState(true);
     const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
     const [contextMenu, setContextMenu] = useState<{
-        position: { x: number; y: number } | null;
-        document: Document | null
+        position: { x: number; y: number } | null; document: Document | null
     }>({
-        position: null,
-        document: null
+        position: null, document: null
     });
 
     // Add global search state
@@ -92,27 +89,22 @@ function AppContent() {
     }, []);
 
     // Create a new document - wrapper around context function
-    const createDocument = useCallback((type: string, language?: string) => {
+    const createDocument = useCallback((type: DocumentType, language?: string) => {
         createContextDocument(type, language).then(id => {
             // Open the document in the editor
             if (dockviewApi) {
-                const newDoc = documents.find(doc => doc.id === id);
+                const newDoc = documents.find(doc => parseInt(doc.id) === id);
                 if (newDoc) {
                     dockviewApi.addPanel({
-                        id: `editor-${id}`,
-                        component: 'documentEditor',
-                        params: {
-                            document: newDoc,
-                            onUpdate: (content: string) => updateDocument(id, content)
-                        },
-                        title: newDoc.title
+                        id: `editor-${id}`, component: 'documentEditor', params: {
+                            document: newDoc, onUpdate: (content: string) => updateDocument(id, content)
+                        }, title: newDoc.title
                     });
                     saveLayoutRef.current();
 
                     // Show success toast
                     showToast(`Created new ${type} document`, {
-                        type: 'success',
-                        duration: 2000
+                        type: 'success', duration: 2000
                     });
                 }
             }
@@ -121,7 +113,7 @@ function AppContent() {
 
     // Open document in editor
     const openDocument = useCallback((doc: Document) => {
-        openContextDocument(doc.id!);
+        openContextDocument(parseInt(doc.id));
 
         // Check if document is already open in editor
         if (dockviewApi) {
@@ -131,13 +123,9 @@ function AppContent() {
             } else {
                 // Open new editor panel
                 dockviewApi.addPanel({
-                    id: `editor-${doc.id}`,
-                    component: 'documentEditor',
-                    params: {
-                        document: doc,
-                        onUpdate: (content: string) => updateDocument(doc.id!, content)
-                    },
-                    title: doc.title
+                    id: `editor-${doc.id}`, component: 'documentEditor', params: {
+                        document: doc, onUpdate: (content: string) => updateDocument(parseInt(doc.id), content)
+                    }, title: doc.title
                 });
             }
         }
@@ -145,7 +133,7 @@ function AppContent() {
 
     // Delete document with confirmation
     const deleteDocument = useCallback((id: number) => {
-        const doc = documents.find(d => d.id === id);
+        const doc = documents.find(d => parseInt(d.id) === id);
         if (doc) {
             setDocumentToDelete(doc);
         }
@@ -155,17 +143,15 @@ function AppContent() {
     const handleConfirmDelete = useCallback(() => {
         if (documentToDelete) {
             const docTitle = documentToDelete.title;
-            closeDocument(documentToDelete.id!);
+            closeDocument(parseInt(documentToDelete.id));
 
             // Delete the document from storage
-            StorageService.deleteDocument(documentToDelete.id!)
+            StorageService.deleteDocument(parseInt(documentToDelete.id))
                 .then(() => {
                     console.log(`Document ${documentToDelete.id} deleted successfully`);
                     showToast(`Deleted "${docTitle}"`, {
-                        type: 'success',
-                        action: {
-                            label: 'Undo',
-                            onClick: () => {
+                        type: 'success', action: {
+                            label: 'Undo', onClick: () => {
                                 // In a real app, you'd implement undo functionality here
                                 showToast('Undo functionality would be implemented here', {type: 'info'});
                             }
@@ -187,7 +173,7 @@ function AppContent() {
                         const panels = group.panels;
                         panels.forEach(panel => {
                             if (panel.id === `editor-${documentToDelete.id}` || panel.id === `preview-${documentToDelete.id}`) {
-                                panel.close();
+                                panel.api.close();
                             }
                         });
                     });
@@ -212,9 +198,7 @@ function AppContent() {
 
         // Create updated document
         const updatedDoc = {
-            ...activeDocument,
-            title,
-            updatedAt: new Date()
+            ...activeDocument, title, updatedAt: new Date()
         };
 
         // Save document to storage
@@ -266,7 +250,7 @@ function AppContent() {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            const fileName = `${activeDocument.title}.${getFileExtension(activeDocument.type)}`;
+            const fileName = `${activeDocument.title}.${getFileExtension(activeDocument.type.type)}`;
             a.download = fileName;
             document.body.appendChild(a);
             a.click();
@@ -295,36 +279,29 @@ function AppContent() {
         const editorPanel = dockviewApi.getPanel(editorPanelId);
 
         if (existingPanel) {
-            existingPanel.close();
+            existingPanel.api.close();
             showToast('Preview closed', {type: 'info', duration: 1500});
         } else {
             // Create panel config
             const panelConfig: any = {
-                id: previewPanelId,
-                component: 'documentPreview',
-                params: {
+                id: previewPanelId, component: 'documentPreview', params: {
                     document: activeDocument
-                },
-                title: `Preview: ${activeDocument.title}`
+                }, title: `Preview: ${activeDocument.title}`
             };
 
             // Only add position if editor panel exists
             if (editorPanel) {
                 panelConfig.position = {
-                    referencePanel: editorPanelId,
-                    direction: 'right'
+                    referencePanel: editorPanelId, direction: 'right'
                 };
             }
 
             dockviewApi.addPanel(panelConfig);
 
-            if (activeDocument.type === 'markdown') {
+            if (activeDocument.type.type === 'markdown') {
                 showToast('Markdown preview opened', {
-                    type: 'info',
-                    duration: 2000,
-                    action: {
-                        label: 'Split View',
-                        onClick: () => {
+                    type: 'info', duration: 2000, action: {
+                        label: 'Split View', onClick: () => {
                             // This would ideally switch to a split view mode
                             showToast('Split view would be implemented here', {type: 'info'});
                         }
@@ -340,98 +317,70 @@ function AppContent() {
     const getContextMenuItems = useCallback((): ContextMenuItem[] => {
         if (!contextMenu.document) return [];
 
-        return [
-            {
-                id: 'open',
-                label: 'Open',
-                icon: 'ri-file-line',
-                action: () => openDocument(contextMenu.document!),
-                shortcut: '↵'
-            },
-            {
-                id: 'preview',
-                label: 'Preview',
-                icon: 'ri-eye-line',
-                action: () => {
-                    openDocument(contextMenu.document!);
-                    setTimeout(() => togglePreview(), 100);
-                },
-                shortcut: 'Ctrl+P'
-            },
-            {
-                id: 'rename',
-                label: 'Rename',
-                icon: 'ri-edit-line',
-                action: () => {
-                    openDocument(contextMenu.document!);
-                    // This will trigger the rename UI in PropertiesPanel
-                }
-            },
-            {
-                id: 'export',
-                label: 'Export',
-                icon: 'ri-download-line',
-                action: () => {
-                    openDocument(contextMenu.document!);
-                    exportDocument();
-                },
-                shortcut: 'Ctrl+E'
-            },
-            {
-                id: 'duplicate',
-                label: 'Duplicate',
-                icon: 'ri-file-copy-line',
-                action: () => {
-                    // Implement duplicate functionality
-                    const docToDuplicate = contextMenu.document!;
-                    const newDoc = {
-                        ...docToDuplicate,
-                        id: undefined,
-                        title: `${docToDuplicate.title} (Copy)`,
-                        createdAt: new Date(),
-                        updatedAt: new Date()
-                    };
-                    createDocument(newDoc.type, newDoc.language);
-                }
-            },
-            {
-                id: 'delete',
-                label: 'Delete',
-                icon: 'ri-delete-bin-line',
-                action: () => setDocumentToDelete(contextMenu.document),
-                isDestructive: true,
-                divider: true
+        return [{
+            id: 'open',
+            label: 'Open',
+            icon: 'ri-file-line',
+            action: () => openDocument(contextMenu.document!),
+            shortcut: '↵'
+        }, {
+            id: 'preview', label: 'Preview', icon: 'ri-eye-line', action: () => {
+                openDocument(contextMenu.document!);
+                setTimeout(() => togglePreview(), 100);
+            }, shortcut: 'Ctrl+P'
+        }, {
+            id: 'rename', label: 'Rename', icon: 'ri-edit-line', action: () => {
+                openDocument(contextMenu.document!);
+                // This will trigger the rename UI in PropertiesPanel
             }
-        ];
+        }, {
+            id: 'export', label: 'Export', icon: 'ri-download-line', action: () => {
+                openDocument(contextMenu.document!);
+                exportDocument();
+            }, shortcut: 'Ctrl+E'
+        }, {
+            id: 'duplicate', label: 'Duplicate', icon: 'ri-file-copy-line', action: () => {
+                // Implement duplicate functionality
+                const docToDuplicate = contextMenu.document!;
+                const newDoc = {
+                    ...docToDuplicate,
+                    id: undefined,
+                    title: `${docToDuplicate.title} (Copy)`,
+                    createdAt: new Date(),
+                    updatedAt: new Date()
+                };
+                createDocument(newDoc.type, newDoc.language);
+            }
+        }, {
+            id: 'delete',
+            label: 'Delete',
+            icon: 'ri-delete-bin-line',
+            action: () => setDocumentToDelete(contextMenu.document),
+            isDestructive: true,
+            divider: true
+        }];
     }, [contextMenu.document, openDocument, togglePreview, exportDocument, createDocument]);
 
     // Initialize default layout
-    const initializeDefaultLayout = useCallback((api: IDockviewApi) => {
+    const initializeDefaultLayout = useCallback((api: DockviewApi) => {
         // Add explorer panel by default
         api.addPanel({
-            id: 'explorer',
-            component: 'explorer',
-            params: {
+            id: 'explorer', component: 'explorer', params: {
                 documents,
                 onSelectDocument: openDocument,
                 onCreateDocument: createDocument,
                 onDeleteDocument: deleteDocument
-            },
-            title: 'Explorer'
+            }, title: 'Explorer'
         });
 
         // If we have an active document, open it
         if (activeDocument) {
             api.addPanel({
-                id: `editor-${activeDocument.id}`,
-                component: 'documentEditor',
-                params: {
-                    document: activeDocument,
-                    onUpdate: (content: string) => {
-                        updateDocument(activeDocument.id!, content);
+                id: `editor-${activeDocument.id}`, component: 'documentEditor', params: {
+                    document: activeDocument, onUpdate: (content: string) => {
+                        updateDocument(parseInt(activeDocument.id), content);
                     }
-                },
-                title: activeDocument.title
+                }, title: activeDocument.title
             });
         }
     }, [activeDocument, documents, openDocument, createDocument, deleteDocument, updateDocument]);
@@ -505,31 +454,30 @@ function AppContent() {
                 try {
                     // Don't set global isLoading - this affects the entire app
                     // Instead, we'll track saving state at the document level
-                    
+
                     // First save all dirty documents
                     const dirtyDocIds = Object.entries(documentStates)
                         .filter(([, state]) => state.isDirty)
                         .map(([id]) => parseInt(id));
-                    
+
                     // Save each dirty document
                     const savePromises = dirtyDocIds.map(id => {
-                        const doc = documents.find(d => d.id === id);
+                        const doc = documents.find(d => parseInt(d.id) === id);
                         if (doc) {
                             return saveDocument(doc);
                         }
                         return Promise.resolve();
                     });
-                    
+
                     // Wait for all documents to save
                     await Promise.all(savePromises);
-                    
+
                     // Then save the layout
                     await LayoutService.saveLayout(dockviewApi);
-                    
+
                     // Show success toast when layout is explicitly saved (not auto-saved)
                     showToast('Layout saved successfully', {
-                        type: 'success',
-                        duration: 2000
+                        type: 'success', duration: 2000
                     });
                 } catch (e) {
                     console.error('Error saving layout to localStorage:', e);
@@ -543,8 +491,7 @@ function AppContent() {
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             // Only process if not in an input or textarea
-            if ((e.target as HTMLElement).tagName === 'INPUT' ||
-                (e.target as HTMLElement).tagName === 'TEXTAREA') {
+            if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') {
                 return;
             }
 
@@ -563,7 +510,7 @@ function AppContent() {
             // Ctrl/Cmd + N: New document
             if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
                 e.preventDefault();
-                createDocument('text');
+                createDocument({type: 'text'} as DocumentType);
             }
 
             // Ctrl/Cmd + E: Export document
@@ -621,12 +568,10 @@ function AppContent() {
     }, [isLoading]);
 
     // Render the UI
-    return (
-        <div
+    return (<div
             className="app-container h-screen flex flex-col overflow-hidden"
             style={{
-                backgroundColor: currentTheme.colors.background,
-                color: currentTheme.colors.foreground
+                backgroundColor: currentTheme.colors.background, color: currentTheme.colors.foreground
             }}
         >
             {/* Confirmation Modal for deletion */}
@@ -666,8 +611,7 @@ function AppContent() {
 
             {/* Loading overlay */}
             <AnimatePresence>
-                {isLoading && (
-                    <motion.div
+                {isLoading && (<motion.div
                         initial={{opacity: 1}}
                         animate={{opacity: 1}}
                         exit={{opacity: 0}}
@@ -681,8 +625,7 @@ function AppContent() {
                             <h1 className="text-2xl font-bold mb-2">Engineer's Notepad</h1>
                             <p className="text-lg opacity-70">Loading your workspace...</p>
                         </div>
-                    </motion.div>
-                )}
+                    </motion.div>)}
             </AnimatePresence>
 
             {/* App header */}
@@ -698,12 +641,10 @@ function AppContent() {
 
             <div className="app-content flex-1 flex overflow-hidden">
                 {/* Sidebar - conditionally rendered based on showSidebar state */}
-                {showSidebar && (
-                    <Sidebar
+                {showSidebar && (<Sidebar
                         onToggleSidebar={toggleSidebar}
                         onSelectDocument={openDocument}
-                    />
-                )}
+                    />)}
 
                 {/* Main content area with dockview */}
                 <div className="flex-1 overflow-hidden relative">
@@ -719,24 +660,21 @@ function AppContent() {
 
             <footer className="app-footer p-2 text-xs border-t flex justify-between items-center"
                     style={{
-                        backgroundColor: currentTheme.colors.sidebar,
-                        borderColor: currentTheme.colors.border
+                        backgroundColor: currentTheme.colors.sidebar, borderColor: currentTheme.colors.border
                     }}
             >
                 <div className="flex space-x-4">
-                    {activeDocument && (
-                        <>
+                    {activeDocument && (<>
                             <span className="flex items-center">
                                 <i className="ri-file-type-line mr-1"></i>
-                                {activeDocument.type.toUpperCase()}
+                                {activeDocument.type.type.toUpperCase()}
                                 {activeDocument.language && ` - ${activeDocument.language}`}
                             </span>
                             <span className="flex items-center">
                                 <i className="ri-time-line mr-1"></i>
                                 Last modified: {new Date(activeDocument.updatedAt).toLocaleString()}
                             </span>
-                        </>
-                    )}
+                        </>)}
                 </div>
                 <div className="flex items-center">
                     <span className="flex items-center text-green-500 dark:text-green-400">
@@ -745,8 +683,7 @@ function AppContent() {
                     </span>
                 </div>
             </footer>
-        </div>
-    );
+        </div>);
 }
 
 export default AppWithProviders;

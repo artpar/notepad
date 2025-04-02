@@ -3,9 +3,10 @@ import React, { useState } from 'react';
 import { useSettings } from '../../contexts/SettingsContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import 'remixicon/fonts/remixicon.css';
+import {DocumentType} from "../../types/DocumentType.tsx";
 
 interface WelcomeProps {
-    onCreateDocument: (type: string, language?: string) => void;
+    onCreateDocument: (type: DocumentType, language?: string) => void;
     onClose: () => void;
     isOpen: boolean;
 }
@@ -121,7 +122,6 @@ const Welcome: React.FC<WelcomeProps> = ({ onCreateDocument, onClose, isOpen }) 
                                             style={{
                                                 borderColor: currentTheme.colors.border,
                                                 backgroundColor: currentTheme.isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
-                                                hoverBackgroundColor: currentTheme.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'
                                             }}
                                             onClick={() => {
                                                 onCreateDocument(docType.type);

@@ -1,13 +1,14 @@
 // src/components/Layout/AppHeader.tsx
 import React, { useState } from 'react';
 import { useSettings } from '../../contexts/SettingsContext';
-import { useDocuments } from '../../contexts/DocumentContext';
 import useDocumentActions from '../../hooks/useDocumentActions';
 import useKeyboardShortcuts from '../../hooks/useKeyboardShortcuts';
 import { IconButton, MenuButton } from '../UI/Buttons';
 import DocumentTypeMenu from '../UI/DocumentTypeMenu';
+import {DocumentType} from '../../types/DocumentType.tsx';
 import HelpMenu from '../UI/HelpMenu';
 import 'remixicon/fonts/remixicon.css';
+import {useDocuments} from "../../contexts/UseDocuments.tsx";
 
 interface AppHeaderProps {
   onSaveLayout: () => void;
@@ -32,12 +33,12 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   const { activeDocument, createDocument } = useDocuments();
   const { getDocumentIcon } = useDocumentActions();
   const { getShortcutKey } = useKeyboardShortcuts();
-  
+
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [showHelpMenu, setShowHelpMenu] = useState(false);
 
   return (
-    <header 
+    <header
       className="app-header flex items-center justify-between p-2 border-b"
       style={{
         backgroundColor: currentTheme.colors.headerBackground,
@@ -58,11 +59,11 @@ const AppHeader: React.FC<AppHeaderProps> = ({
       <div className="flex-1 mx-6 text-center hidden md:block">
         {activeDocument && (
           <div className="flex items-center justify-center">
-            <i 
-              className={`${getDocumentIcon(activeDocument.type, activeDocument.language)} mr-2`} 
+            <i
+              className={`${getDocumentIcon(activeDocument.type.type, activeDocument.language)} mr-2`}
               style={{color: currentTheme.colors.headerText}}
             />
-            <span 
+            <span
               className="font-medium"
               style={{color: currentTheme.colors.headerText}}
             >
@@ -92,9 +93,9 @@ const AppHeader: React.FC<AppHeaderProps> = ({
           title="Create New Document"
           showLabel="sm"
         >
-          <DocumentTypeMenu 
+          <DocumentTypeMenu
             onSelectType={(type, language) => {
-              createDocument(type as any, language);
+              createDocument({"type": type} as DocumentType, language);
               setShowCreateMenu(false);
             }}
           />

@@ -7,9 +7,11 @@ interface SearchBarProps {
     value: string;
     onChange: (value: string) => void;
     onSearch?: () => void;
+    onClear?: () => void;
     placeholder?: string;
     autoFocus?: boolean;
     showSearchIcon?: boolean;
+    isSearching?: boolean;
     showClearButton?: boolean;
     className?: string;
 }
@@ -18,9 +20,11 @@ const SearchBar: React.FC<SearchBarProps> = ({
                                                  value,
                                                  onChange,
                                                  onSearch,
+                                                 onClear,
                                                  placeholder = 'Search...',
                                                  autoFocus = false,
                                                  showSearchIcon = true,
+                                                 isSearching = false,
                                                  showClearButton = true,
                                                  className = ''
                                              }) => {
@@ -67,7 +71,6 @@ const SearchBar: React.FC<SearchBarProps> = ({
                     backgroundColor: currentTheme.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
                     borderColor: currentTheme.colors.border,
                     borderWidth: '1px',
-                    ringColor: currentTheme.colors.accent + '40'
                 }}
             >
                 {showSearchIcon && (

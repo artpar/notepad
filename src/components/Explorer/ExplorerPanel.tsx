@@ -1,13 +1,14 @@
 // src/components/Explorer/ExplorerPanel.tsx
-import React, { useMemo, useState, useCallback } from 'react';
-import { IDockviewPanelProps } from 'dockview';
-import { Document } from '../../types/document';
-import { useSettings } from '../../contexts/SettingsContext';
+import React, {useCallback, useMemo, useState} from 'react';
+import {IDockviewPanelProps} from 'dockview';
+import {Document} from '../../types/document';
+import {useSettings} from '../../contexts/SettingsContext';
 import SearchBar from '../UI/SearchBar';
 import DocumentItem from '../Layout/DocumentItem';
 import ConfirmationModal from '../UI/ConfirmationModal';
-import { AnimatePresence, motion } from 'framer-motion';
+import {AnimatePresence, motion} from 'framer-motion';
 import 'remixicon/fonts/remixicon.css';
+import {DocumentType} from "../../types/DocumentType"
 
 type DocType = 'text' | 'markdown' | 'javascript' | 'python' | 'html';
 
@@ -19,9 +20,9 @@ interface ExplorerPanelProps {
 }
 
 const ExplorerPanel: React.FC<IDockviewPanelProps<ExplorerPanelProps>> = (props) => {
-    const { params } = props;
-    const { documents, onSelectDocument, onCreateDocument, onDeleteDocument } = params;
-    const { currentTheme } = useSettings();
+    const {params} = props;
+    const {documents, onSelectDocument, onCreateDocument, onDeleteDocument} = params;
+    const {currentTheme} = useSettings();
     const [searchTerm, setSearchTerm] = useState('');
     const [createMenuOpen, setCreateMenuOpen] = useState(false);
     const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
@@ -34,8 +35,8 @@ const ExplorerPanel: React.FC<IDockviewPanelProps<ExplorerPanelProps>> = (props)
         const tagSet = new Set<string>();
         documents.forEach(doc => {
             doc.tags?.forEach(tag => tagSet.add(tag));
-            tagSet.add(doc.type);
-            if (doc.type === 'code' && doc.language) {
+            tagSet.add(doc.type.type);
+            if (doc.type.type === 'code' && doc.language) {
                 tagSet.add(doc.language);
             }
         });
@@ -51,7 +52,7 @@ const ExplorerPanel: React.FC<IDockviewPanelProps<ExplorerPanelProps>> = (props)
             filtered = filtered.filter(doc =>
                 doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 doc.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                doc.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                doc.type.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 (doc.language && doc.language.toLowerCase().includes(searchTerm.toLowerCase())) ||
                 (doc.tags && doc.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())))
             );
@@ -60,7 +61,7 @@ const ExplorerPanel: React.FC<IDockviewPanelProps<ExplorerPanelProps>> = (props)
         // Apply tag filter
         if (filterTag) {
             filtered = filtered.filter(doc =>
-                doc.type === filterTag ||
+                doc.type.type === filterTag ||
                 doc.language === filterTag ||
                 (doc.tags && doc.tags.includes(filterTag))
             );
@@ -72,7 +73,7 @@ const ExplorerPanel: React.FC<IDockviewPanelProps<ExplorerPanelProps>> = (props)
                 case 'name':
                     return a.title.localeCompare(b.title);
                 case 'type':
-                    return a.type.localeCompare(b.type);
+                    return a.type.type.localeCompare(b.type.type);
                 case 'date':
                 default:
                     return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
@@ -83,8 +84,8 @@ const ExplorerPanel: React.FC<IDockviewPanelProps<ExplorerPanelProps>> = (props)
     }, [documents, searchTerm, filterTag, sortOption]);
 
     // Get document type icon
-    const getDocTypeIcon = (type: DocType): string => {
-        switch (type) {
+    const getDocTypeIcon = (type: DocumentType): string => {
+        switch (type.type) {
             case 'text':
                 return 'ri-file-text-line';
             case 'markdown':
@@ -103,7 +104,7 @@ const ExplorerPanel: React.FC<IDockviewPanelProps<ExplorerPanelProps>> = (props)
     // Handle document deletion confirmation
     const handleConfirmDelete = useCallback(() => {
         if (documentToDelete && documentToDelete.id) {
-            onDeleteDocument(documentToDelete.id);
+            onDeleteDocument(parseInt(documentToDelete.id));
             setDocumentToDelete(null);
         }
     }, [documentToDelete, onDeleteDocument]);
@@ -147,7 +148,6 @@ const ExplorerPanel: React.FC<IDockviewPanelProps<ExplorerPanelProps>> = (props)
                 isActive={false} // This will be set by the parent component if needed
                 onClick={() => onSelectDocument(doc)}
                 onDelete={(e) => handleDeleteClick(e, doc)}
-                theme={currentTheme}
                 highlightText={searchTerm}
             />
         );
@@ -242,7 +242,6 @@ const ExplorerPanel: React.FC<IDockviewPanelProps<ExplorerPanelProps>> = (props)
                     value={searchTerm}
                     onChange={handleSearchChange}
                     placeholder="Search documents..."
-                    theme={currentTheme}
                 />
             </div>
 
@@ -279,7 +278,8 @@ const ExplorerPanel: React.FC<IDockviewPanelProps<ExplorerPanelProps>> = (props)
                                 className="max-w-xs"
                             >
                                 <i className="ri-file-add-line text-5xl text-gray-300 dark:text-gray-600 mb-3"></i>
-                                <h4 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-2">No documents yet</h4>
+                                <h4 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-2">No documents
+                                    yet</h4>
                                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                                     Create your first document to get started with Engineer's Notepad
                                 </p>
@@ -331,7 +331,7 @@ const ExplorerPanel: React.FC<IDockviewPanelProps<ExplorerPanelProps>> = (props)
                                 >
                                     <div className="flex justify-between items-start mb-2">
                                         <div className="rounded-full p-2 bg-gray-100 dark:bg-gray-800">
-                                            <i className={`${getDocTypeIcon(doc.type as DocType)} text-lg text-blue-500 dark:text-blue-400`}></i>
+                                            <i className={`${getDocTypeIcon(doc.type as DocumentType)} text-lg text-blue-500 dark:text-blue-400`}></i>
                                         </div>
                                         <button
                                             className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 dark:hover:text-red-400 p-1"
@@ -342,7 +342,7 @@ const ExplorerPanel: React.FC<IDockviewPanelProps<ExplorerPanelProps>> = (props)
                                     </div>
                                     <h4 className="font-medium text-gray-800 dark:text-gray-200 truncate">{doc.title}</h4>
                                     <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 flex items-center">
-                                        <span>{doc.type}</span>
+                                        <span>{doc.type.type}</span>
                                         <span className="mx-1">•</span>
                                         <span>{new Date(doc.updatedAt).toLocaleDateString()}</span>
                                     </div>

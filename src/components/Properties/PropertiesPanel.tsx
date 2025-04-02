@@ -12,7 +12,7 @@ interface PropertiesPanelProps {
 
 const PropertiesPanel: React.FC<IDockviewPanelProps<PropertiesPanelProps>> = (props) => {
     const { params } = props;
-    const { document, onUpdateTitle } = params;
+    const { document: currentDoc, onUpdateTitle } = params;
     const { currentTheme } = useSettings();
 
     const [editingTitle, setEditingTitle] = useState('');
@@ -23,15 +23,15 @@ const PropertiesPanel: React.FC<IDockviewPanelProps<PropertiesPanelProps>> = (pr
 
     // Update local state when document changes
     useEffect(() => {
-        if (document) {
-            setEditingTitle(document.title);
-            setTagsInput(document.tags?.join(', ') || '');
+        if (currentDoc) {
+            setEditingTitle(currentDoc.title);
+            setTagsInput(currentDoc.tags?.join(', ') || '');
         }
-    }, [document?.id, document?.title, document?.tags]);
+    }, [currentDoc?.id, currentDoc?.title, currentDoc?.tags]);
 
     // Handle title click to edit
     const handleTitleClick = () => {
-        if (document) {
+        if (currentDoc) {
             setIsTitleFocused(true);
             // Focus the input after state update
             setTimeout(() => {
@@ -50,11 +50,11 @@ const PropertiesPanel: React.FC<IDockviewPanelProps<PropertiesPanelProps>> = (pr
 
     // Handle title update when user finishes editing
     const handleTitleBlur = () => {
-        if (document && editingTitle.trim() !== '') {
+        if (currentDoc && editingTitle.trim() !== '') {
             onUpdateTitle(editingTitle);
-        } else if (document) {
+        } else if (currentDoc) {
             // Reset to original if empty
-            setEditingTitle(document.title);
+            setEditingTitle(currentDoc.title);
         }
         setIsTitleFocused(false);
     };
@@ -62,14 +62,14 @@ const PropertiesPanel: React.FC<IDockviewPanelProps<PropertiesPanelProps>> = (pr
     // Handle key press in title input
     const handleTitleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter') {
-            if (document && editingTitle.trim() !== '') {
+            if (currentDoc && editingTitle.trim() !== '') {
                 onUpdateTitle(editingTitle);
             }
             setIsTitleFocused(false);
         } else if (e.key === 'Escape') {
             // Reset to original title and exit editing mode
-            if (document) {
-                setEditingTitle(document.title);
+            if (currentDoc) {
+                setEditingTitle(currentDoc.title);
             }
             setIsTitleFocused(false);
         }
@@ -84,7 +84,7 @@ const PropertiesPanel: React.FC<IDockviewPanelProps<PropertiesPanelProps>> = (pr
     const toggleTagsEditing = () => {
         setIsTagsEditing(!isTagsEditing);
         // Focus the tags input after opening it
-        if (!isTagsEditing && document) {
+        if (!isTagsEditing && currentDoc) {
             setTimeout(() => {
                 const tagsInput = document.querySelector('#tags-input') as HTMLInputElement;
                 if (tagsInput) {
@@ -96,8 +96,8 @@ const PropertiesPanel: React.FC<IDockviewPanelProps<PropertiesPanelProps>> = (pr
 
     // Get file icon based on document type
     const getFileIcon = (doc: Document) => {
-        if (doc.type === 'text') return 'ri-file-text-line';
-        if (doc.type === 'markdown') return 'ri-markdown-line';
+        if (doc.type.type === 'text') return 'ri-file-text-line';
+        if (doc.type.type === 'markdown') return 'ri-markdown-line';
 
         // Code files
         switch (doc.language) {
@@ -131,7 +131,7 @@ const PropertiesPanel: React.FC<IDockviewPanelProps<PropertiesPanelProps>> = (pr
         return content.length;
     };
 
-    if (!document) {
+    if (!currentDoc) {
         return (
             <div
                 className="flex flex-col items-center justify-center h-full p-4 text-center"
@@ -149,7 +149,7 @@ const PropertiesPanel: React.FC<IDockviewPanelProps<PropertiesPanelProps>> = (pr
             {/* Document title with inline editing */}
             <div className="mb-3">
                 <div className="flex items-center mb-1">
-                    <i className={`${getFileIcon(document)} mr-2 text-lg`} style={{ color: currentTheme.colors.accent }}></i>
+                    <i className={`${getFileIcon(currentDoc)} mr-2 text-lg`} style={{ color: currentTheme.colors.accent }}></i>
                     {isTitleFocused ? (
                         <input
                             ref={titleInputRef}
@@ -172,7 +172,7 @@ const PropertiesPanel: React.FC<IDockviewPanelProps<PropertiesPanelProps>> = (pr
                             onClick={handleTitleClick}
                             title="Click to edit title"
                         >
-                            {document.title}
+                            {currentDoc.title}
                         </div>
                     )}
                 </div>
@@ -186,10 +186,10 @@ const PropertiesPanel: React.FC<IDockviewPanelProps<PropertiesPanelProps>> = (pr
                             color: currentTheme.colors.foreground
                         }}
                     >
-                        {document.type.charAt(0).toUpperCase() + document.type.slice(1)}
+                        {currentDoc.type.type.charAt(0).toUpperCase() + currentDoc.type.type.slice(1)}
                     </div>
 
-                    {document.language && (
+                    {currentDoc.language && (
                         <div
                             className="px-2 py-1 rounded-full text-xs font-medium"
                             style={{
@@ -197,12 +197,12 @@ const PropertiesPanel: React.FC<IDockviewPanelProps<PropertiesPanelProps>> = (pr
                                 color: currentTheme.colors.accent
                             }}
                         >
-                            {document.language.charAt(0).toUpperCase() + document.language.slice(1)}
+                            {currentDoc.language.charAt(0).toUpperCase() + currentDoc.language.slice(1)}
                         </div>
                     )}
 
                     <div className="ml-auto text-xs opacity-60">
-                        {getWordCount(document.content)} words
+                        {getWordCount(currentDoc.content)} words
                     </div>
                 </div>
             </div>
@@ -222,19 +222,19 @@ const PropertiesPanel: React.FC<IDockviewPanelProps<PropertiesPanelProps>> = (pr
                     <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2 pl-6">
                         <div>
                             <div className="text-xs opacity-70">Words</div>
-                            <div className="text-sm">{getWordCount(document.content)}</div>
+                            <div className="text-sm">{getWordCount(currentDoc.content)}</div>
                         </div>
                         <div>
                             <div className="text-xs opacity-70">Characters</div>
-                            <div className="text-sm">{getCharCount(document.content)}</div>
+                            <div className="text-sm">{getCharCount(currentDoc.content)}</div>
                         </div>
                         <div>
                             <div className="text-xs opacity-70">Created</div>
-                            <div className="text-sm">{formatDate(document.createdAt)}</div>
+                            <div className="text-sm">{formatDate(currentDoc.createdAt)}</div>
                         </div>
                         <div>
                             <div className="text-xs opacity-70">Modified</div>
-                            <div className="text-sm">{formatDate(document.updatedAt)}</div>
+                            <div className="text-sm">{formatDate(currentDoc.updatedAt)}</div>
                         </div>
                     </div>
                 </details>
@@ -290,8 +290,8 @@ const PropertiesPanel: React.FC<IDockviewPanelProps<PropertiesPanelProps>> = (pr
                         ) : (
                             <div>
                                 <div className="flex flex-wrap gap-1.5 mb-2">
-                                    {document.tags && document.tags.length > 0 ? (
-                                        document.tags.map((tag, index) => (
+                                    {currentDoc.tags && currentDoc.tags.length > 0 ? (
+                                        currentDoc.tags.map((tag, index) => (
                                             <span
                                                 key={index}
                                                 className="px-2 py-0.5 rounded-full text-xs inline-flex items-center"

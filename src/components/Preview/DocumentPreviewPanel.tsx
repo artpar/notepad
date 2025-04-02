@@ -22,17 +22,8 @@ const DocumentPreviewPanel: React.FC<IDockviewPanelProps<DocumentPreviewPanelPro
   // Configure marked with syntax highlighting
   useEffect(() => {
     marked.setOptions({
-      highlight: function(code, lang) {
-        if (lang && hljs.getLanguage(lang)) {
-          try {
-            return hljs.highlight(code, { language: lang }).value;
-          } catch (err) {}
-        }
-        return hljs.highlightAuto(code).value;
-      },
       gfm: true,
       breaks: true,
-      smartLists: true,
     });
   }, []);
 
@@ -43,7 +34,7 @@ const DocumentPreviewPanel: React.FC<IDockviewPanelProps<DocumentPreviewPanelPro
 
   // Simple preview rendering based on document type
   const renderPreview = () => {
-    switch (document.type) {
+    switch (document.type.type) {
       case 'markdown':
         return (
             <div

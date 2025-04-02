@@ -1,7 +1,6 @@
 // src/components/Layout/Sidebar.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSettings } from '../../contexts/SettingsContext';
-import { useDocuments } from '../../contexts/DocumentContext';
 import useDocumentActions from '../../hooks/useDocumentActions';
 import { Document } from '../../types/document';
 import DocumentItem from './DocumentItem';
@@ -12,6 +11,8 @@ import { IconButton, MenuButton } from '../UI/Buttons';
 import DocumentTypeMenu from '../UI/DocumentTypeMenu';
 import TagSelector from '../UI/TagSelector';
 import 'remixicon/fonts/remixicon.css';
+import {useDocuments} from "../../contexts/UseDocuments.tsx";
+import {DocumentType} from "../../types/DocumentType.tsx";
 
 enum SidebarTab {
   Files = 'files',
@@ -52,11 +53,11 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleSidebar, onSelectDocument }) 
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [filterTag, setFilterTag] = useState<string | null>(null);
   const [sortOption, setSortOption] = useState<'name' | 'date' | 'type'>('date');
-  
+
   // Refs
   const sidebarRef = useRef<HTMLDivElement>(null);
   const resizeRef = useRef<HTMLDivElement>(null);
-  
+
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
     position: { x: number; y: number } | null;
@@ -90,8 +91,8 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleSidebar, onSelectDocument }) 
     const tagSet = new Set<string>();
     documents.forEach(doc => {
       doc.tags?.forEach(tag => tagSet.add(tag));
-      tagSet.add(doc.type);
-      if (doc.type === 'code' && doc.language) {
+      tagSet.add(doc.type.type);
+      if (doc.type.type === 'code' && doc.language) {
         tagSet.add(doc.language);
       }
     });
@@ -112,7 +113,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleSidebar, onSelectDocument }) 
       filtered = filtered.filter(doc =>
         doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         doc.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        doc.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        doc.type.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (doc.language && doc.language.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (doc.tags && doc.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())))
       );
@@ -121,7 +122,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleSidebar, onSelectDocument }) 
     // Apply tag filter
     if (filterTag) {
       filtered = filtered.filter(doc =>
-        doc.type === filterTag ||
+        doc.type.type === filterTag ||
         doc.language === filterTag ||
         (doc.tags && doc.tags.includes(filterTag))
       );
@@ -133,7 +134,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleSidebar, onSelectDocument }) 
         case 'name':
           return a.title.localeCompare(b.title);
         case 'type':
-          return a.type.localeCompare(b.type);
+          return a.type.type.localeCompare(b.type);
         case 'date':
         default:
           return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
@@ -145,7 +146,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleSidebar, onSelectDocument }) 
 
   // Handle document creation
   const handleNewFile = useCallback((type: string, language?: string) => {
-    createDocument(type, language);
+    createDocument({type: type} as DocumentType, language);
     setCreateMenuOpen(false);
   }, [createDocument]);
 

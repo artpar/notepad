@@ -8,9 +8,12 @@ export interface AppTheme {
     editorTheme: string;
     colors: {
         background: string;
+        buttonBackground: string;
         foreground: string;
         accent: string;
         sidebar: string;
+        inputBackground: string;
+        inputText: string;
         sidebarText: string;
         headerBackground: string;
         headerText: string;
@@ -28,6 +31,9 @@ export interface EditorSettings {
     wordWrap: boolean;
     lineNumbers: boolean;
     highlightActiveLine: boolean;
+    showStatistics: boolean;
+    autoSaveInterval: number;
+    autoSave: boolean;
     indentWithTabs: boolean;
     autoCloseBrackets: boolean;
     matchBrackets: boolean;
@@ -37,6 +43,5 @@ export interface AppSettings {
     id?: number;
     theme: ThemeName;
     editor: EditorSettings;
-    autosaveInterval: number;
     customKeybindings?: Record<string, string>;
 }

@@ -6,7 +6,7 @@ import 'remixicon/fonts/remixicon.css';
 
 interface ConfirmationModalProps {
     title: string;
-    message: string;
+    message: React.ReactNode;
     confirmLabel?: string;
     cancelLabel?: string;
     isDestructive?: boolean;
