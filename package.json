@@ -23,6 +23,7 @@
     "dexie": "^4.0.11",
     "dockview": "^4.2.1",
     "dockview-core": "^4.2.1",
+    "framer-motion": "^12.6.3",
     "highlight.js": "^11.11.1",
     "jspdf": "^3.0.1",
     "katex": "^0.16.21",

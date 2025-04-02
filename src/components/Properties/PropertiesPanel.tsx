@@ -16,11 +16,13 @@ const PropertiesPanel: React.FC<IDockviewPanelProps<PropertiesPanelProps>> = (pr
     const {currentTheme} = useSettings();
     const [isEditing, setIsEditing] = useState<Record<string, boolean>>({});
     const [editingTitle, setEditingTitle] = useState('');
+    const [tagsInput, setTagsInput] = useState('');
 
     // Update local title state when document changes
     useEffect(() => {
         if (document) {
             setEditingTitle(document.title);
+            setTagsInput(document.tags?.join(', ') || '');
         }
     }, [document?.id, document?.title]);
 
@@ -45,6 +47,18 @@ const PropertiesPanel: React.FC<IDockviewPanelProps<PropertiesPanelProps>> = (pr
         if (field === 'title' && isEditing.title) {
             // When finishing editing, update the document title
             handleTitleUpdate();
+        }
+
+        if (field === 'tags' && !isEditing.tags) {
+            // When starting to edit tags, initialize the input
+            setTagsInput(document?.tags?.join(', ') || '');
+        }
+
+        if (field === 'tags' && isEditing.tags) {
+            // When finishing editing tags, process them
+            // This is just a placeholder - actual tag updating would need to be implemented
+            // const newTags = tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
+            // Update document tags logic would go here
         }
 
         setIsEditing(prev => ({
@@ -78,6 +92,11 @@ const PropertiesPanel: React.FC<IDockviewPanelProps<PropertiesPanelProps>> = (pr
                 title: false
             }));
         }
+    };
+
+    // Handle tags input change
+    const handleTagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setTagsInput(e.target.value);
     };
 
     // Get word count from document content
@@ -233,7 +252,8 @@ const PropertiesPanel: React.FC<IDockviewPanelProps<PropertiesPanelProps>> = (pr
                             <input
                                 type="text"
                                 placeholder="Add tags separated by commas"
-                                value={document.tags?.join(', ') || ''}
+                                value={tagsInput}
+                                onChange={handleTagsChange}
                                 className="w-full p-2 rounded border text-sm mb-1"
                                 style={{
                                     backgroundColor: currentTheme.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',

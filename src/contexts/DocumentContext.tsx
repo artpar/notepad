@@ -11,7 +11,7 @@ interface DocumentContextType {
   openTabs: TabInfo[];
   activeTabId: string | null;
   isLoading: boolean;
-  
+
   // Actions
   createDocument: (type: Document['type'], language?: string) => Promise<number>;
   openDocument: (id: number) => Promise<void>;
@@ -81,9 +81,9 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     const id = await StorageService.saveDocument(newDoc);
     newDoc.id = id;
-    
+
     setDocuments(prev => [...prev, newDoc]);
-    
+
     // Create a tab for the new document
     const tabId = `doc-${id}`;
     const newTab: TabInfo = {
@@ -92,28 +92,28 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       documentId: id,
       type: 'document'
     };
-    
+
     setOpenTabs(prev => [...prev, newTab]);
     setActiveTabId(tabId);
     setActiveDocument(newDoc);
-    
+
     setDocumentStates(prev => ({
       ...prev,
       [id]: { isDirty: false, isSaving: false }
     }));
-    
+
     return id;
   };
 
   const openDocument = async (id: number): Promise<void> => {
     // Check if document is already open in a tab
     const existingTabIndex = openTabs.findIndex(tab => tab.documentId === id);
-    
+
     if (existingTabIndex >= 0) {
       setActiveTabId(openTabs[existingTabIndex].id);
     } else {
       const document = await StorageService.getDocument(id);
-      
+
       if (document) {
         const tabId = `doc-${id}`;
         const newTab: TabInfo = {
@@ -122,11 +122,11 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           documentId: id,
           type: 'document'
         };
-        
+
         setOpenTabs(prev => [...prev, newTab]);
         setActiveTabId(tabId);
         setActiveDocument(document);
-        
+
         if (!documentStates[id]) {
           setDocumentStates(prev => ({
             ...prev,
@@ -139,39 +139,39 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const saveDocument = async (document: Document): Promise<void> => {
     if (!document.id) return;
-    
+
     setDocumentStates(prev => ({
       ...prev,
       [document.id!]: { ...prev[document.id!], isSaving: true }
     }));
-    
+
     try {
       await StorageService.saveDocument(document);
-      
-      setDocuments(prev => 
+
+      setDocuments(prev =>
         prev.map(doc => doc.id === document.id ? document : doc)
       );
-      
+
       setDocumentStates(prev => ({
         ...prev,
-        [document.id!]: { 
-          isDirty: false, 
+        [document.id!]: {
+          isDirty: false,
           isSaving: false,
           lastSaved: new Date()
         }
       }));
-      
+
       // Update tab title if needed
-      setOpenTabs(prev => 
-        prev.map(tab => 
-          tab.documentId === document.id 
-            ? { ...tab, title: document.title, isDirty: false } 
+      setOpenTabs(prev =>
+        prev.map(tab =>
+          tab.documentId === document.id
+            ? { ...tab, title: document.title, isDirty: false }
             : tab
         )
       );
     } catch (error) {
       console.error('Failed to save document', error);
-      
+
       setDocumentStates(prev => ({
         ...prev,
         [document.id!]: { ...prev[document.id!], isSaving: false }
@@ -184,17 +184,17 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (documentStates[id]?.isDirty) {
       await saveDocument(documents.find(doc => doc.id === id)!);
     }
-    
+
     // Close all tabs for this document
     const updatedTabs = openTabs.filter(tab => tab.documentId !== id);
     setOpenTabs(updatedTabs);
-    
+
     // If the active document is being closed, set a new active document
     if (activeDocument?.id === id) {
       if (updatedTabs.length > 0) {
         const lastTab = updatedTabs[updatedTabs.length - 1];
         setActiveTabId(lastTab.id);
-        
+
         if (lastTab.documentId) {
           const doc = documents.find(d => d.id === lastTab.documentId);
           setActiveDocument(doc || null);
@@ -208,48 +208,40 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
-  const updateDocument = useCallback((id: number, content: string) => {
-    console.log("DocumentContext: updateDocument", id, content);
-    
-    // Update the document in the documents array
-    setDocuments(prev => {
-      return prev.map(doc => {
-        if (doc.id === id) {
-          return { ...doc, content, updatedAt: new Date() };
-        }
-        return doc;
-      });
-    });
-    
-    // Update active document if it's the one being edited
-    setActiveDocument(prev => {
-      if (prev && prev.id === id) {
-        return { ...prev, content, updatedAt: new Date() };
-      }
-      return prev;
-    });
-    
+  const updateDocument = useCallback(async (id: number, content: string) => {
     // Mark document as dirty
     setDocumentStates(prev => ({
       ...prev,
       [id]: { ...prev[id], isDirty: true }
     }));
-    
+
     // Update tabs
-    setOpenTabs(prev => 
-      prev.map(tab => 
+    setOpenTabs(prev =>
+      prev.map(tab =>
         tab.documentId === id ? { ...tab, isDirty: true } : tab
       )
     );
-    
-    // Trigger immediate save for the document
-    const docToSave = documents.find(doc => doc.id === id);
+
+    // Find the document to save
+    let docToSave = documents.find(doc => doc.id === id);
+
+    // If document not found in state, try to fetch it directly from storage
+    if (!docToSave) {
+      docToSave = await StorageService.getDocument(id);
+      // If we found the document in storage, add it to our state
+      if (docToSave) {
+        setDocuments(prev => [...(prev.filter(e => docToSave.id !== e.id)), docToSave!]);
+      }
+    }
+
     if (docToSave) {
       const updatedDoc = { ...docToSave, content, updatedAt: new Date() };
       // Use setTimeout to avoid state update conflicts
       setTimeout(() => {
         saveDocument(updatedDoc);
       }, 0);
+    } else {
+      console.error(`Could not find document with id ${id} to update`);
     }
   }, [documents, saveDocument]);
 
@@ -257,7 +249,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const tab = openTabs.find(t => t.id === tabId);
     if (tab) {
       setActiveTabId(tabId);
-      
+
       if (tab.documentId) {
         const doc = documents.find(d => d.id === tab.documentId);
         setActiveDocument(doc || null);
@@ -269,23 +261,23 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const closeTab = async (tabId: string) => {
     const tab = openTabs.find(t => t.id === tabId);
-    
+
     if (tab && tab.documentId) {
       // Only close the tab, don't delete the document
       if (documentStates[tab.documentId]?.isDirty) {
         await saveDocument(documents.find(doc => doc.id === tab.documentId)!);
       }
     }
-    
+
     const updatedTabs = openTabs.filter(t => t.id !== tabId);
     setOpenTabs(updatedTabs);
-    
+
     // If the active tab is being closed, set a new active tab
     if (activeTabId === tabId) {
       if (updatedTabs.length > 0) {
         const lastTab = updatedTabs[updatedTabs.length - 1];
         setActiveTabId(lastTab.id);
-        
+
         if (lastTab.documentId) {
           const doc = documents.find(d => d.id === lastTab.documentId);
           setActiveDocument(doc || null);
@@ -310,7 +302,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     openTabs,
     activeTabId,
     isLoading,
-    
+
     createDocument,
     openDocument,
     saveDocument,

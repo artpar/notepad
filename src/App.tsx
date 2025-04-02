@@ -1,10 +1,12 @@
 // src/App.tsx
-import {useEffect, useMemo, useState, useCallback} from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import './App.css';
 import Sidebar from './components/Layout/Sidebar';
-import {useDocuments} from './contexts/DocumentContext';
+import AppHeader from './components/Layout/AppHeader';
+import { useDocuments } from './contexts/DocumentContext';
+import { useSettings } from './contexts/SettingsContext';
 
-import {DockviewReact, DockviewReadyEvent, IDockviewApi, PanelCollection, SerializedDockview} from 'dockview';
+import { DockviewReact, DockviewReadyEvent, IDockviewApi, PanelCollection, SerializedDockview } from 'dockview';
 import 'dockview/dist/styles/dockview.css';
 
 // Import components
@@ -12,23 +14,14 @@ import DocumentEditorPanel from './components/Editor/DocumentEditorPanel';
 import DocumentPreviewPanel from './components/Preview/DocumentPreviewPanel';
 import ExplorerPanel from './components/Explorer/ExplorerPanel';
 import PropertiesPanel from './components/Properties/PropertiesPanel';
-import {CustomGroupPanel, CustomWatermarkPanel} from './components/Panels/CustomPanels';
+import { CustomGroupPanel, CustomWatermarkPanel } from './components/Panels/CustomPanels';
+
 // Helper functions
-import {loadDocumentsFromStorage, loadLayoutFromStorage} from './utils/storage';
+import { loadDocumentsFromStorage, loadLayoutFromStorage } from './utils/storage';
 import * as StorageService from './services/storage';
 import 'remixicon/fonts/remixicon.css';
-
-// Types for our document system
-type DocType = 'text' | 'markdown' | 'javascript' | 'python' | 'html';
-
-interface Document {
-    id: string;
-    title: string;
-    content: string;
-    type: DocType;
-    createdAt: Date;
-    updatedAt: Date;
-}
+import { getDocument } from "./services/storage";
+import { motion, AnimatePresence } from 'framer-motion';
 
 function App() {
     // Use the document context instead of managing documents locally
@@ -42,12 +35,14 @@ function App() {
         closeDocument
     } = useDocuments();
 
-    const [isDarkMode, setIsDarkMode] = useState(false);
+    const { currentTheme } = useSettings();
     const [dockviewApi, setDockviewApi] = useState<IDockviewApi | null>(null);
     const [savedLayout, setSavedLayout] = useState<SerializedDockview | undefined>(loadLayoutFromStorage());
+    const [showSidebar, setShowSidebar] = useState(true);
+    const [isLoading, setIsLoading] = useState(true);
 
     // Save layout to localStorage whenever it changes
-    const saveLayout = () => {
+    const saveLayout = useCallback(() => {
         if (dockviewApi) {
             try {
                 const layout = dockviewApi.toJSON();
@@ -56,11 +51,11 @@ function App() {
                 console.error('Error saving layout to localStorage:', e);
             }
         }
-    };
+    }, [dockviewApi]);
 
     // Create a new document - wrapper around context function
-    const createDocument = (type: DocType) => {
-        createContextDocument(type).then(id => {
+    const createDocument = useCallback((type: string, language?: string) => {
+        createContextDocument(type, language).then(id => {
             // Open the document in the editor
             if (dockviewApi) {
                 const newDoc = documents.find(doc => doc.id === id);
@@ -74,13 +69,14 @@ function App() {
                         },
                         title: newDoc.title
                     });
+                    saveLayout();
                 }
             }
         });
-    };
+    }, [createContextDocument, documents, dockviewApi, updateDocument, saveLayout]);
 
     // Update document title
-    const updateDocumentTitle = (title: string) => {
+    const updateDocumentTitle = useCallback((title: string) => {
         if (!activeDoc) return;
 
         const updatedDoc = {
@@ -92,16 +88,17 @@ function App() {
         saveDocument(updatedDoc);
 
         // Update panel title if it exists
+        saveLayout();
         if (dockviewApi) {
             const panel = dockviewApi.getPanel(`editor-${activeDoc.id}`);
             if (panel) {
                 panel.setTitle(title);
             }
         }
-    };
+    }, [activeDoc, dockviewApi, saveDocument, saveLayout]);
 
     // Delete a document
-    const deleteDocument = (id: number) => {
+    const deleteDocument = useCallback((id: number) => {
         closeDocument(id);
 
         // Delete the document from storage
@@ -114,15 +111,16 @@ function App() {
             });
 
         // Close related panels if they exist
+        saveLayout();
         if (dockviewApi) {
             try {
                 // Instead of trying to remove panels directly, let's get all groups and panels
                 const groups = dockviewApi.groups;
-                
+
                 // Iterate through all groups to find and close panels by ID
                 groups.forEach(group => {
                     const panels = group.panels;
-                    
+
                     // Look for editor and preview panels for this document
                     panels.forEach(panel => {
                         if (panel.id === `editor-${id}` || panel.id === `preview-${id}`) {
@@ -135,21 +133,31 @@ function App() {
                 console.error(`Error removing panels for document ${id}:`, error);
             }
         }
-    };
+    }, [closeDocument, dockviewApi, saveLayout]);
 
-    // Toggle dark mode
-    const toggleDarkMode = () => {
-        setIsDarkMode(!isDarkMode);
-        if (!isDarkMode) {
-            document.body.classList.add('dark-mode');
-        } else {
-            document.body.classList.remove('dark-mode');
-        }
-    };
+    // Toggle sidebar visibility
+    const toggleSidebar = useCallback(() => {
+        setShowSidebar(prev => !prev);
+    }, []);
 
     // Export the current document
-    const exportDocument = () => {
+    const exportDocument = useCallback(() => {
         if (!activeDoc) return;
+
+        const getFileExtension = (type: string): string => {
+            switch (type) {
+                case 'markdown':
+                    return 'md';
+                case 'javascript':
+                    return 'js';
+                case 'python':
+                    return 'py';
+                case 'html':
+                    return 'html';
+                default:
+                    return 'txt';
+            }
+        };
 
         const blob = new Blob([activeDoc.content], {type: 'text/plain'});
         const url = URL.createObjectURL(blob);
@@ -160,26 +168,10 @@ function App() {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-    };
-
-    // Get file extension based on document type
-    const getFileExtension = (type: DocType): string => {
-        switch (type) {
-            case 'markdown':
-                return 'md';
-            case 'javascript':
-                return 'js';
-            case 'python':
-                return 'py';
-            case 'html':
-                return 'html';
-            default:
-                return 'txt';
-        }
-    };
+    }, [activeDoc]);
 
     // Open document in editor - wrapper around context function
-    const openDocument = (doc: Document) => {
+    const openDocument = useCallback((doc: any) => {
         openContextDocument(doc.id!);
 
         // Check if document is already open in editor
@@ -200,10 +192,10 @@ function App() {
                 });
             }
         }
-    };
+    }, [dockviewApi, openContextDocument, updateDocument]);
 
     // Toggle preview for the current document
-    const togglePreview = () => {
+    const togglePreview = useCallback(() => {
         if (!activeDoc || !dockviewApi) return;
 
         const previewPanelId = `preview-${activeDoc.id}`;
@@ -219,8 +211,7 @@ function App() {
                 id: previewPanelId,
                 component: 'documentPreview',
                 params: {
-                    document: activeDoc,
-                    onUpdate: (content: string) => updateDocument(doc.id!, content)
+                    document: activeDoc
                 },
                 title: `Preview: ${activeDoc.title}`
             };
@@ -235,11 +226,17 @@ function App() {
 
             dockviewApi.addPanel(panelConfig);
         }
-    };
+    }, [activeDoc, dockviewApi]);
 
     // Handle keyboard shortcuts
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            // Only process if not in an input or textarea
+            if ((e.target as HTMLElement).tagName === 'INPUT' ||
+                (e.target as HTMLElement).tagName === 'TEXTAREA') {
+                return;
+            }
+
             // Ctrl/Cmd + S: Save layout
             if ((e.ctrlKey || e.metaKey) && e.key === 's') {
                 e.preventDefault();
@@ -263,11 +260,17 @@ function App() {
                 e.preventDefault();
                 exportDocument();
             }
+
+            // Ctrl/Cmd + B: Toggle sidebar
+            if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+                e.preventDefault();
+                toggleSidebar();
+            }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [activeDoc, dockviewApi]);
+    }, [activeDoc, dockviewApi, saveLayout, togglePreview, createDocument, exportDocument, toggleSidebar]);
 
     // Components for the dockview
     const components = useMemo<PanelCollection>(() => ({
@@ -278,7 +281,7 @@ function App() {
     }), []);
 
     // Handle dockview ready event
-    const handleDockviewReady = (event: DockviewReadyEvent) => {
+    const handleDockviewReady = useCallback(async (event: DockviewReadyEvent) => {
         setDockviewApi(event.api);
 
         // If we have a saved layout, restore it
@@ -295,9 +298,10 @@ function App() {
                     const docId = panelObject.params.document?.id;
                     if (docId) {
                         // Use the updateDocument function directly without capturing it in a closure
+                        const doc = await getDocument(docId);
+                        panelObject.params.document = doc;
                         panelObject.params["onUpdate"] = ((panelObject) => {
                             return (content: string) => {
-                                console.log("on update from layout", panelObject.params, content);
                                 updateDocument(panelObject.params.document.id, content);
                             }
                         })(panelObject);
@@ -311,14 +315,31 @@ function App() {
         } else {
             initializeDefaultLayout(event.api);
         }
+
         // Save layout when panels are moved or resized
         event.api.onDidLayoutChange(() => {
             saveLayout();
         });
-    };
+
+        // Set loading to false once everything is initialized
+        setIsLoading(false);
+    }, [savedLayout, updateDocument]);
 
     // Initialize default layout
-    const initializeDefaultLayout = (api: IDockviewApi) => {
+    const initializeDefaultLayout = useCallback((api: IDockviewApi) => {
+        // Add explorer panel by default
+        api.addPanel({
+            id: 'explorer',
+            component: 'explorer',
+            params: {
+                documents,
+                onSelectDocument: openDocument,
+                onCreateDocument: createDocument,
+                onDeleteDocument: deleteDocument
+            },
+            title: 'Explorer'
+        });
+
         // If we have an active document, open it
         if (activeDoc) {
             api.addPanel({
@@ -327,63 +348,113 @@ function App() {
                 params: {
                     document: activeDoc,
                     onUpdate: (content: string) => {
-                        console.log("on update", content);
                         updateDocument(activeDoc.id!, content);
                     }
                 },
                 title: activeDoc.title
             });
         }
-    };
+    }, [activeDoc, documents, openDocument, createDocument, deleteDocument, updateDocument]);
+
+    // Apply theme to body
+    useEffect(() => {
+        if (currentTheme.isDark) {
+            document.body.classList.add('dark-mode');
+        } else {
+            document.body.classList.remove('dark-mode');
+        }
+    }, [currentTheme.isDark]);
 
     // Render the UI
     return (
-        <div className={`app-container ${isDarkMode ? 'dark-mode' : ''}`}>
-            <header className="app-header">
-                <h1>Engineer's Notepad</h1>
-                <div className="header-controls">
-                    <div className="header-buttons">
-                        <button onClick={toggleDarkMode}>
-                            {isDarkMode ? 'Light Mode' : 'Dark Mode'}
-                        </button>
-                        <button onClick={saveLayout} title="Save Layout (Ctrl+S)">
-                            Save Layout
-                        </button>
-                        {activeDoc && (
-                            <>
-                                <button onClick={togglePreview} title="Toggle Preview (Ctrl+P)">
-                                    Toggle Preview
-                                </button>
-                                <button onClick={exportDocument} title="Export Document (Ctrl+E)">
-                                    Export
-                                </button>
-                            </>
-                        )}
-                    </div>
-                </div>
-            </header>
+        <div
+            className="app-container h-screen flex flex-col overflow-hidden"
+            style={{
+                backgroundColor: currentTheme.colors.background,
+                color: currentTheme.colors.foreground
+            }}
+        >
+            {/* Loading overlay */}
+            <AnimatePresence>
+                {isLoading && (
+                    <motion.div
+                        initial={{ opacity: 1 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.5 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center"
+                        style={{ backgroundColor: currentTheme.colors.background }}
+                    >
+                        <div className="text-center">
+                            <i className="ri-quill-pen-line text-6xl mb-4" style={{ color: currentTheme.colors.accent }}></i>
+                            <h1 className="text-2xl font-bold mb-2">Engineer's Notepad</h1>
+                            <p className="text-lg opacity-70">Loading your workspace...</p>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
-            <div className="app-content flex">
-                <Sidebar
-                    documents={documents}
-                    activeDoc={activeDoc}
-                    onSelectDocument={openDocument}
-                    onCreateDocument={createDocument}
-                    onDeleteDocument={deleteDocument}
-                    onUpdateTitle={updateDocumentTitle}
-                />
-                <DockviewReact
-                    components={components}
-                    onReady={handleDockviewReady}
-                    watermarkComponent={CustomWatermarkPanel}
-                    groupPanel={CustomGroupPanel}
-                    className="dockview-theme-light"
-                />
+            {/* App header */}
+            <AppHeader
+                onSaveLayout={saveLayout}
+                onTogglePreview={togglePreview}
+                onExportDocument={exportDocument}
+                onToggleSidebar={toggleSidebar}
+                showSidebar={showSidebar}
+            />
+
+            <div className="app-content flex-1 flex overflow-hidden">
+                {/* Sidebar - conditionally rendered based on showSidebar state */}
+                {showSidebar && (
+                    <Sidebar
+                        documents={documents}
+                        activeDoc={activeDoc}
+                        onSelectDocument={openDocument}
+                        onCreateDocument={createDocument}
+                        onDeleteDocument={deleteDocument}
+                        onUpdateTitle={updateDocumentTitle}
+                    />
+                )}
+
+                {/* Main content area with dockview */}
+                <div className="flex-1 overflow-hidden relative">
+                    <DockviewReact
+                        components={components}
+                        onReady={handleDockviewReady}
+                        watermarkComponent={CustomWatermarkPanel}
+                        groupPanel={CustomGroupPanel}
+                        className={`dockview-theme-${currentTheme.isDark ? 'dark' : 'light'}`}
+                    />
+                </div>
             </div>
 
-            <footer className="app-footer">
-                <p>Engineer's Notepad | Keyboard Shortcuts: Ctrl+S (Save Layout), Ctrl+P (Preview), Ctrl+N (New), Ctrl+E
-                    (Export)</p>
+            <footer className="app-footer p-2 text-xs border-t flex justify-between items-center"
+                    style={{
+                        backgroundColor: currentTheme.colors.sidebar,
+                        borderColor: currentTheme.colors.border
+                    }}
+            >
+                <div className="flex space-x-4">
+                    {activeDoc && (
+                        <>
+                            <span className="flex items-center">
+                                <i className="ri-file-type-line mr-1"></i>
+                                {activeDoc.type.toUpperCase()}
+                                {activeDoc.language && ` - ${activeDoc.language}`}
+                            </span>
+                            <span className="flex items-center">
+                                <i className="ri-time-line mr-1"></i>
+                                Last modified: {new Date(activeDoc.updatedAt).toLocaleString()}
+                            </span>
+                        </>
+                    )}
+                </div>
+                <div className="flex items-center">
+                    <span className="flex items-center text-green-500 dark:text-green-400">
+                        <i className="ri-save-line mr-1"></i>
+                        Autosaved
+                    </span>
+                </div>
             </footer>
         </div>
     );

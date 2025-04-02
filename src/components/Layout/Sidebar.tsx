@@ -1,8 +1,11 @@
 // src/components/Layout/Sidebar.tsx
-import React, {useEffect, useRef, useState} from 'react';
-import {useSettings} from '../../contexts/SettingsContext';
-import {Document} from '../../types/document';
+import React, { useEffect, useRef, useState } from 'react';
+import { useSettings } from '../../contexts/SettingsContext';
+import { Document } from '../../types/document';
 import PropertiesPanel from '../Properties/PropertiesPanel';
+import DocumentItem from './DocumentItem';
+import SearchBar from '../UI/SearchBar';
+import { motion, AnimatePresence } from 'framer-motion';
 import 'remixicon/fonts/remixicon.css';
 
 enum SidebarTab {
@@ -28,42 +31,63 @@ const Sidebar: React.FC<SidebarProps> = ({
                                              onDeleteDocument,
                                              onUpdateTitle
                                          }) => {
-    const {currentTheme, toggleTheme, settings, updateEditorSettings} = useSettings();
+    const { currentTheme, toggleTheme, settings } = useSettings();
     const [activeTab, setActiveTab] = useState<SidebarTab>(SidebarTab.Files);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<Document[]>([]);
     const [isPinned, setIsPinned] = useState(true);
     const [isVisible, setIsVisible] = useState(true);
-    const [width, setWidth] = useState(260); // Default width
+    const [width, setWidth] = useState(260);
+    const [createMenuOpen, setCreateMenuOpen] = useState(false);
     const sidebarRef = useRef<HTMLDivElement>(null);
     const resizeRef = useRef<HTMLDivElement>(null);
     const [isResizing, setIsResizing] = useState(false);
+    const [groupedDocuments, setGroupedDocuments] = useState<Record<string, Document[]>>({});
+
+    // Group documents by type
+    useEffect(() => {
+        const groups: Record<string, Document[]> = {
+            recent: documents.slice().sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).slice(0, 5),
+            markdown: documents.filter(doc => doc.type === 'markdown'),
+            code: documents.filter(doc => doc.type === 'code' || doc.type === 'javascript' || doc.type === 'python' || doc.type === 'html'),
+            text: documents.filter(doc => doc.type === 'text')
+        };
+        setGroupedDocuments(groups);
+    }, [documents]);
 
     // Handle search functionality
-    const handleSearch = () => {
-        if (!searchQuery.trim()) {
-            setSearchResults([]);
-            return;
-        }
+    useEffect(() => {
+        const delaySearch = setTimeout(() => {
+            if (!searchQuery.trim()) {
+                setSearchResults([]);
+                return;
+            }
 
-        // Simple client-side search implementation
-        const results = documents.filter(doc =>
-            doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            doc.content.toLowerCase().includes(searchQuery.toLowerCase())
-        );
+            // Simple client-side search
+            const results = documents.filter(doc =>
+                doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                doc.content.toLowerCase().includes(searchQuery.toLowerCase())
+            );
 
-        setSearchResults(results);
-    };
+            setSearchResults(results);
+        }, 300);
+
+        return () => clearTimeout(delaySearch);
+    }, [searchQuery, documents]);
 
     // Handle document creation
-    const handleNewFile = (type: 'text' | 'markdown' | 'code', language?: string) => {
-        onCreateDocument(type, language);
+    const handleNewFile = (type: 'text' | 'markdown' | 'javascript' | 'python' | 'html') => {
+        const mappedType = type === 'javascript' || type === 'python' || type === 'html' ? 'code' : type;
+        const language = type === 'javascript' || type === 'python' || type === 'html' ? type : undefined;
+
+        onCreateDocument(mappedType, language);
+        setCreateMenuOpen(false);
     };
 
-    // Handle document deletion
+    // Handle document deletion with confirmation
     const handleDeleteDocument = (e: React.MouseEvent, docId: number) => {
         e.stopPropagation();
-        if (confirm('Are you sure you want to delete this document?')) {
+        if (window.confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
             onDeleteDocument(docId);
         }
     };
@@ -78,11 +102,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
     const handleMouseMove = (e: MouseEvent) => {
         if (!isResizing) return;
-
-        // Calculate new width based on mouse position
         const newWidth = e.clientX;
-
-        // Set min and max width constraints
         if (newWidth >= 200 && newWidth <= 500) {
             setWidth(newWidth);
         }
@@ -96,23 +116,17 @@ const Sidebar: React.FC<SidebarProps> = ({
 
     // Handle sidebar visibility
     const handleMouseEnter = () => {
-        if (!isPinned) {
-            setIsVisible(true);
-        }
+        if (!isPinned) setIsVisible(true);
     };
 
     const handleMouseLeave = () => {
-        if (!isPinned) {
-            setIsVisible(false);
-        }
+        if (!isPinned) setIsVisible(false);
     };
 
     // Toggle pin state
     const togglePin = () => {
         setIsPinned(!isPinned);
-        if (!isPinned) {
-            setIsVisible(true);
-        }
+        if (!isPinned) setIsVisible(true);
     };
 
     // Toggle sidebar visibility
@@ -128,59 +142,66 @@ const Sidebar: React.FC<SidebarProps> = ({
         };
     }, [isResizing]);
 
-    // Get file icon based on document type and language
-    const getFileIcon = (doc: Document) => {
-        if (doc.type === 'text') return 'ri-file-text-line';
-        if (doc.type === 'markdown') return 'ri-markdown-line';
+    // Render document groups
+    const renderDocumentGroup = (title: string, docs: Document[]) => {
+        if (!docs || docs.length === 0) return null;
 
-        if (doc.type === 'code') {
-            switch (doc.language) {
-                case 'javascript':
-                    return 'ri-javascript-line';
-                case 'typescript':
-                    return 'ri-code-s-slash-line';
-                case 'python':
-                    return 'ri-code-line';
-                case 'html':
-                    return 'ri-html5-line';
-                case 'css':
-                    return 'ri-css3-line';
-                case 'java':
-                    return 'ri-code-box-line';
-                default:
-                    return 'ri-file-code-line';
-            }
-        }
-
-        return 'ri-file-line';
+        return (
+            <div className="mb-4">
+                <h3 className="text-xs uppercase font-semibold tracking-wide mb-2 px-3 opacity-70">{title}</h3>
+                <div className="space-y-1">
+                    {docs.map((doc) => (
+                        <DocumentItem
+                            key={doc.id}
+                            document={doc}
+                            isActive={activeDoc?.id === doc.id}
+                            onClick={() => onSelectDocument(doc)}
+                            onDelete={(e) => handleDeleteDocument(e, doc.id!)}
+                            theme={currentTheme}
+                        />
+                    ))}
+                </div>
+            </div>
+        );
     };
 
     return (
         <>
             {/* Sidebar toggle button (visible when sidebar is hidden) */}
-            {!isVisible && (
-                <button
-                    className="fixed top-4 left-4 z-10 p-2 rounded-full shadow-md"
-                    onClick={toggleSidebar}
-                    style={{
-                        backgroundColor: currentTheme.colors.accent,
-                        color: '#fff'
-                    }}
-                >
-                    <i className="ri-menu-line text-lg"></i>
-                </button>
-            )}
+            <AnimatePresence>
+                {!isVisible && (
+                    <motion.button
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -20 }}
+                        transition={{ duration: 0.2 }}
+                        className="fixed top-4 left-4 z-10 p-2 rounded-full shadow-lg"
+                        onClick={toggleSidebar}
+                        style={{
+                            backgroundColor: currentTheme.colors.accent,
+                            color: '#fff'
+                        }}
+                    >
+                        <i className="ri-menu-line text-lg"></i>
+                    </motion.button>
+                )}
+            </AnimatePresence>
 
             {/* Main sidebar container */}
-            <div
+            <motion.div
                 ref={sidebarRef}
-                className={`h-full flex flex-col transition-all duration-300 ease-in-out ${isVisible ? '' : 'translate-x-[-100%]'}`}
+                animate={{
+                    width: isVisible ? width : 0,
+                    opacity: isVisible ? 1 : 0,
+                    boxShadow: isVisible ? (currentTheme.isDark ? "0 0 15px rgba(0,0,0,0.5)" : "0 0 15px rgba(0,0,0,0.1)") : "none"
+                }}
+                transition={{ duration: 0.3, ease: "easeInOut" }}
+                className="h-full flex flex-col relative"
                 style={{
-                    width: `${width}px`,
                     backgroundColor: currentTheme.colors.sidebar,
                     borderRight: `1px solid ${currentTheme.colors.border}`,
-                    position: 'relative',
-                    zIndex: 10
+                    zIndex: 10,
+                    overflow: "hidden"
                 }}
                 onMouseEnter={handleMouseEnter}
                 onMouseLeave={handleMouseLeave}
@@ -191,17 +212,18 @@ const Sidebar: React.FC<SidebarProps> = ({
                 >
                     <div className="flex items-center">
                         <i className="ri-book-2-line text-xl mr-2" style={{color: currentTheme.colors.accent}}></i>
+                        <span className="font-semibold">Engineer's Notes</span>
                     </div>
                     <div className="flex">
                         <button
-                            className="p-1.5 rounded-full hover:bg-opacity-20 hover:bg-gray-500"
+                            className="p-1.5 rounded-full hover:bg-opacity-20 hover:bg-gray-500 transition-colors"
                             onClick={toggleTheme}
                             title="Toggle Theme"
                         >
                             <i className={`ri-${settings.theme === 'dark' ? 'sun' : 'moon'}-line text-lg`}></i>
                         </button>
                         <button
-                            className="p-1.5 rounded-full hover:bg-opacity-20 hover:bg-gray-500 ml-1"
+                            className="p-1.5 rounded-full hover:bg-opacity-20 hover:bg-gray-500 transition-colors ml-1"
                             onClick={togglePin}
                             title={isPinned ? "Unpin Sidebar" : "Pin Sidebar"}
                         >
@@ -234,174 +256,152 @@ const Sidebar: React.FC<SidebarProps> = ({
                     </button>
                 </div>
 
-                {/* Sidebar content */}
-                {/* Files tab */}
-                {activeTab === SidebarTab.Files && (
-                    <>
-                        <div className="flex justify-between items-center mb-3">
-                            <h2 className="font-semibold">Documents</h2>
-                            <div className="relative group">
-                                <button
-                                    className="px-2 py-1 rounded flex items-center text-sm"
-                                    style={{
-                                        backgroundColor: `${currentTheme.colors.accent}20`,
-                                        color: currentTheme.colors.accent
-                                    }}
-                                >
-                                    <i className="ri-add-line mr-1"></i>New
-                                </button>
-                                <div
-                                    className="absolute right-0 mt-1 w-48 shadow-lg rounded border hidden group-hover:block z-20"
-                                    style={{
-                                        backgroundColor: currentTheme.colors.background,
-                                        borderColor: currentTheme.colors.border
-                                    }}
-                                >
-                                    <button
-                                        className="block w-full text-left px-4 py-2 hover:bg-opacity-10 hover:bg-gray-500"
-                                        onClick={() => handleNewFile('text')}
-                                    >
-                                        <i className="ri-file-text-line mr-2"></i>Text File
-                                    </button>
-                                    <button
-                                        className="block w-full text-left px-4 py-2 hover:bg-opacity-10 hover:bg-gray-500"
-                                        onClick={() => handleNewFile('markdown')}
-                                    >
-                                        <i className="ri-markdown-line mr-2"></i>Markdown
-                                    </button>
-                                    <button
-                                        className="block w-full text-left px-4 py-2 hover:bg-opacity-10 hover:bg-gray-500"
-                                        onClick={() => handleNewFile('code', 'javascript')}
-                                    >
-                                        <i className="ri-javascript-line mr-2"></i>JavaScript
-                                    </button>
-                                    <button
-                                        className="block w-full text-left px-4 py-2 hover:bg-opacity-10 hover:bg-gray-500"
-                                        onClick={() => handleNewFile('code', 'python')}
-                                    >
-                                        <i className="ri-code-line mr-2"></i>Python
-                                    </button>
-                                    <button
-                                        className="block w-full text-left px-4 py-2 hover:bg-opacity-10 hover:bg-gray-500"
-                                        onClick={() => handleNewFile('code', 'html')}
-                                    >
-                                        <i className="ri-html5-line mr-2"></i>HTML
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+                {/* Create new document button - always visible */}
+                <div className="p-3 relative">
+                    <button
+                        className="w-full px-3 py-2 rounded-md flex items-center justify-center text-sm transition-colors"
+                        style={{
+                            backgroundColor: currentTheme.colors.accent,
+                            color: '#fff'
+                        }}
+                        onClick={() => setCreateMenuOpen(!createMenuOpen)}
+                    >
+                        <i className="ri-add-line mr-2"></i>
+                        Create New Document
+                    </button>
 
-                        <div className="space-y-1 h-2/3 max-h-2/3 overflow-y-auto flex flex-col">
-                            {documents && documents.length > 0 ? (
-                                documents.map((doc) => (
-                                    <div
-                                        key={doc.id}
-                                        className={`p-2 rounded cursor-pointer flex items-center group transition-colors ${
-                                            activeDoc?.id === doc.id ? 'bg-opacity-20 bg-gray-500' : 'hover:bg-opacity-10 hover:bg-gray-500'
-                                        }`}
-                                        onClick={() => onSelectDocument(doc)}
+                    {/* Create document dropdown */}
+                    <AnimatePresence>
+                        {createMenuOpen && (
+                            <motion.div
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                transition={{ duration: 0.2 }}
+                                className="absolute left-3 right-3 mt-1 shadow-lg rounded-md z-30 border overflow-hidden"
+                                style={{
+                                    backgroundColor: currentTheme.colors.background,
+                                    borderColor: currentTheme.colors.border
+                                }}
+                            >
+                                {[
+                                    { type: 'text', label: 'Text File', icon: 'ri-file-text-line' },
+                                    { type: 'markdown', label: 'Markdown', icon: 'ri-markdown-line' },
+                                    { type: 'javascript', label: 'JavaScript', icon: 'ri-javascript-line' },
+                                    { type: 'python', label: 'Python', icon: 'ri-code-line' },
+                                    { type: 'html', label: 'HTML', icon: 'ri-html5-line' }
+                                ].map(item => (
+                                    <button
+                                        key={item.type}
+                                        className="block w-full text-left px-4 py-3 hover:bg-opacity-10 hover:bg-gray-500 transition-colors flex items-center gap-2"
+                                        onClick={() => handleNewFile(item.type as any)}
                                     >
-                                        <i className={`mr-2 ${getFileIcon(doc)}`} style={{
-                                            color: activeDoc?.id === doc.id ? currentTheme.colors.accent : 'inherit'
-                                        }}></i>
-                                        <span className="truncate flex-1">{doc.title}</span>
-                                        <span className="text-xs opacity-60 ml-1">
-                        {doc.type === 'code' ? doc.language : doc.type}
-                      </span>
-                                        <button
-                                            className="opacity-0 group-hover:opacity-100 ml-1 p-1 rounded-full hover:bg-opacity-20 hover:bg-gray-500"
-                                            onClick={(e) => handleDeleteDocument(e, doc.id!)}
-                                            title="Delete document"
-                                        >
-                                            <i className="ri-delete-bin-line text-sm"></i>
-                                        </button>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="text-center p-4 opacity-60">
-                                    <i className="ri-file-list-3-line text-3xl mb-2 block"></i>
-                                    <p>No documents yet</p>
-                                    <p className="text-sm">Create a new document to get started</p>
+                                        <i className={`${item.icon} text-lg`} style={{color: currentTheme.colors.accent}}></i>
+                                        <div>
+                                            <div className="font-medium">{item.label}</div>
+                                            <div className="text-xs opacity-60">Create a new {item.label.toLowerCase()} document</div>
+                                        </div>
+                                    </button>
+                                ))}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+
+                {/* Sidebar content - scrollable area */}
+                <div className="flex-1 overflow-y-auto">
+                    {/* Files tab */}
+                    {activeTab === SidebarTab.Files && (
+                        <div className="p-3">
+                            {documents.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center p-8 text-center opacity-60">
+                                    <i className="ri-file-list-3-line text-5xl mb-4"></i>
+                                    <h3 className="font-medium mb-2">No documents yet</h3>
+                                    <p className="text-sm">Create your first document to get started</p>
                                 </div>
+                            ) : (
+                                <>
+                                    {renderDocumentGroup('Recent', groupedDocuments.recent)}
+                                    {renderDocumentGroup('Markdown', groupedDocuments.markdown)}
+                                    {renderDocumentGroup('Code', groupedDocuments.code)}
+                                    {renderDocumentGroup('Text', groupedDocuments.text)}
+                                </>
                             )}
                         </div>
+                    )}
+
+                    {/* Search tab */}
+                    {activeTab === SidebarTab.Search && (
+                        <div className="p-3">
+                            <SearchBar
+                                value={searchQuery}
+                                onChange={setSearchQuery}
+                                placeholder="Search documents..."
+                                theme={currentTheme}
+                            />
+
+                            <div className="mt-4">
+                                {searchQuery.trim() === '' ? (
+                                    <div className="text-center p-4 opacity-60">
+                                        <i className="ri-search-line text-3xl mb-2 block"></i>
+                                        <p>Enter a search term to find documents</p>
+                                    </div>
+                                ) : searchResults.length > 0 ? (
+                                    <div>
+                                        <h3 className="text-xs uppercase font-semibold tracking-wide mb-2 px-1 opacity-70">
+                                            Search Results ({searchResults.length})
+                                        </h3>
+                                        <div className="space-y-1">
+                                            {searchResults.map((doc) => (
+                                                <DocumentItem
+                                                    key={doc.id}
+                                                    document={doc}
+                                                    isActive={activeDoc?.id === doc.id}
+                                                    onClick={() => onSelectDocument(doc)}
+                                                    onDelete={(e) => handleDeleteDocument(e, doc.id!)}
+                                                    theme={currentTheme}
+                                                    highlightText={searchQuery}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="text-center p-4 opacity-60">
+                                        <i className="ri-error-warning-line text-3xl mb-2 block"></i>
+                                        <p>No results found for "{searchQuery}"</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Properties panel */}
+                {activeDoc && (
+                    <div className="border-t" style={{borderColor: currentTheme.colors.border}}>
                         <PropertiesPanel
                             params={{
                                 document: activeDoc,
                                 onUpdateTitle: onUpdateTitle
                             }}
                         />
-                    </>
-                )}
-
-                {/* Search tab */}
-                {activeTab === SidebarTab.Search && (
-                    <div className="">
-                        <div className="mb-3">
-                            <div className="relative">
-                                <input
-                                    type="text"
-                                    placeholder="Search documents..."
-                                    className="w-full p-2 pr-8 rounded border"
-                                    style={{
-                                        backgroundColor: currentTheme.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
-                                        borderColor: currentTheme.colors.border
-                                    }}
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                                />
-                                <button
-                                    onClick={handleSearch}
-                                    className="absolute right-2 top-2 text-gray-500"
-                                >
-                                    <i className="ri-search-line"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="space-y-1">
-                            {searchResults.length > 0 ? (
-                                searchResults.map((doc) => (
-                                    <div
-                                        key={doc.id}
-                                        className="p-2 hover:bg-opacity-10 hover:bg-gray-500 rounded cursor-pointer flex items-center"
-                                        onClick={() => onSelectDocument(doc)}
-                                    >
-                                        <i className={`mr-2 ${getFileIcon(doc)}`}></i>
-                                        <span className="truncate flex-1">{doc.title}</span>
-                                        <span className="text-xs opacity-60 ml-1">
-                        {doc.type === 'code' ? doc.language : doc.type}
-                      </span>
-                                    </div>
-                                ))
-                            ) : searchQuery ? (
-                                <div className="text-center p-4 opacity-60">
-                                    <i className="ri-search-line text-3xl mb-2 block"></i>
-                                    <p>No results found</p>
-                                </div>
-                            ) : (
-                                <div className="text-center p-4 opacity-60">
-                                    <i className="ri-search-line text-3xl mb-2 block"></i>
-                                    <p>Enter a search term</p>
-                                </div>
-                            )}
-                        </div>
                     </div>
                 )}
-            </div>
+            </motion.div>
 
             {/* Resize handle */}
-            <div
-                ref={resizeRef}
-                className="absolute h-full w-1 cursor-ew-resize z-20"
-                style={{
-                    left: `${width}px`,
-                    top: 0,
-                    backgroundColor: isResizing ? currentTheme.colors.accent : 'transparent'
-                }}
-                onMouseDown={handleMouseDown}
-            />
+            {isVisible && (
+                <div
+                    ref={resizeRef}
+                    className="absolute h-full w-1 cursor-ew-resize z-20 hover:bg-opacity-50 hover:bg-blue-400 transition-colors"
+                    style={{
+                        left: `${width}px`,
+                        top: 0,
+                        backgroundColor: isResizing ? currentTheme.colors.accent : 'transparent'
+                    }}
+                    onMouseDown={handleMouseDown}
+                />
+            )}
         </>
     );
 };
