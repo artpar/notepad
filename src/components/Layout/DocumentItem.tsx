@@ -1,5 +1,5 @@
 // src/components/Layout/DocumentItem.tsx
-import React from 'react';
+import React, { memo } from 'react';
 import { Document } from '../../types/document';
 import { AppTheme } from '../../types/settings';
 import 'remixicon/fonts/remixicon.css';
@@ -13,14 +13,15 @@ interface DocumentItemProps {
     highlightText?: string;
 }
 
-const DocumentItem: React.FC<DocumentItemProps> = ({
-                                                       document,
-                                                       isActive,
-                                                       onClick,
-                                                       onDelete,
-                                                       theme,
-                                                       highlightText
-                                                   }) => {
+// Using memo to prevent unnecessary re-renders when other documents change
+const DocumentItem: React.FC<DocumentItemProps> = memo(({
+                                                            document,
+                                                            isActive,
+                                                            onClick,
+                                                            onDelete,
+                                                            theme,
+                                                            highlightText
+                                                        }) => {
     // Get file icon based on document type and language
     const getFileIcon = (doc: Document) => {
         switch (doc.type) {
@@ -39,12 +40,21 @@ const DocumentItem: React.FC<DocumentItemProps> = ({
         }
     };
 
-    // Get document type display text
-    const getDocumentTypeDisplay = (doc: Document) => {
-        if (doc.type === 'code' && doc.language) {
-            return doc.language;
-        }
-        return doc.type;
+    // Format relative time (e.g., "2h ago")
+    const getRelativeTime = (date: Date): string => {
+        const now = new Date();
+        const diffMs = now.getTime() - new Date(date).getTime();
+        const diffSec = Math.floor(diffMs / 1000);
+        const diffMin = Math.floor(diffSec / 60);
+        const diffHour = Math.floor(diffMin / 60);
+        const diffDay = Math.floor(diffHour / 24);
+
+        if (diffSec < 60) return 'just now';
+        if (diffMin < 60) return `${diffMin}m ago`;
+        if (diffHour < 24) return `${diffHour}h ago`;
+        if (diffDay < 30) return `${diffDay}d ago`;
+
+        return new Date(date).toLocaleDateString();
     };
 
     // Highlight matching text if highlightText is provided
@@ -56,18 +66,26 @@ const DocumentItem: React.FC<DocumentItemProps> = ({
             const parts = text.split(regex);
 
             return parts.map((part, i) =>
-                    regex.test(part) ? (
-                        <span key={i} style={{ backgroundColor: `${theme.colors.accent}40`, padding: '0 2px', borderRadius: '2px' }}>
-            {part}
-          </span>
-                    ) : (
-                        part
-                    )
+                regex.test(part) ? (
+                    <span key={i} style={{ backgroundColor: `${theme.colors.accent}40`, padding: '0 2px', borderRadius: '2px' }}>
+                        {part}
+                    </span>
+                ) : (
+                    part
+                )
             );
         } catch (e) {
             // If regex fails, just return the original text
             return text;
         }
+    };
+
+    // Get document type display text
+    const getDocumentTypeDisplay = (doc: Document) => {
+        if (doc.type === 'code' && doc.language) {
+            return doc.language;
+        }
+        return doc.type;
     };
 
     return (
@@ -89,19 +107,19 @@ const DocumentItem: React.FC<DocumentItemProps> = ({
                 }}
             />
 
-            <span
-                className="truncate flex-1"
-                style={{color: theme.colors.sidebarText}}
-            >
-        {highlightText ? highlightMatchingText(document.title) : document.title}
-      </span>
-
-            <span
-                className="text-xs ml-1"
-                style={{color: theme.isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'}}
-            >
-        {getDocumentTypeDisplay(document)}
-      </span>
+            <div className="flex-1 min-w-0">
+                <div
+                    className="truncate"
+                    style={{color: theme.colors.sidebarText}}
+                >
+                    {highlightText ? highlightMatchingText(document.title) : document.title}
+                </div>
+                <div className="flex text-xs" style={{color: theme.isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'}}>
+                    <span>{getDocumentTypeDisplay(document)}</span>
+                    <span className="mx-1">•</span>
+                    <span>{getRelativeTime(document.updatedAt)}</span>
+                </div>
+            </div>
 
             <button
                 className="opacity-0 group-hover:opacity-100 ml-1 p-1 rounded-full hover:bg-opacity-20 hover:bg-gray-500"
@@ -113,6 +131,9 @@ const DocumentItem: React.FC<DocumentItemProps> = ({
             </button>
         </div>
     );
-};
+});
+
+// Set display name for debugging
+DocumentItem.displayName = 'DocumentItem';
 
 export default DocumentItem;

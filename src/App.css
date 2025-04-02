@@ -196,16 +196,6 @@ body {
   font-family: monospace;
 }
 
-/* Properties panel styles */
-.properties-container {
-  padding: 0.5rem;
-  max-height: 40%;
-  overflow-y: auto;
-  border-top: 1px solid var(--border-color);
-  background-color: var(--sidebar-bg);
-  color: var(--sidebar-text);
-}
-
 /* Animations */
 @keyframes fadeIn {
   from { opacity: 0; }

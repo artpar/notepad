@@ -148,9 +148,21 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     try {
       await StorageService.saveDocument(document);
 
-      setDocuments(prev =>
-        prev.map(doc => doc.id === document.id ? document : doc)
-      );
+      // Update the documents list
+      setDocuments(prev => {
+        const docIndex = prev.findIndex(doc => doc.id === document.id);
+        if (docIndex >= 0) {
+          const newDocs = [...prev];
+          newDocs[docIndex] = document;
+          return newDocs;
+        }
+        return prev;
+      });
+
+      // If this is the active document, update it too
+      if (activeDocument?.id === document.id) {
+        setActiveDocument(document);
+      }
 
       setDocumentStates(prev => ({
         ...prev,
@@ -161,13 +173,13 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
       }));
 
-      // Update tab title if needed
+      // Update tab title and dirty state
       setOpenTabs(prev =>
-        prev.map(tab =>
-          tab.documentId === document.id
-            ? { ...tab, title: document.title, isDirty: false }
-            : tab
-        )
+          prev.map(tab =>
+              tab.documentId === document.id
+                  ? { ...tab, title: document.title, isDirty: false }
+                  : tab
+          )
       );
     } catch (error) {
       console.error('Failed to save document', error);

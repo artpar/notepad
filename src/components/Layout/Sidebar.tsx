@@ -148,10 +148,6 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div className="p-3 flex justify-between items-center border-b"
                  style={{borderColor: currentTheme.colors.border}}
             >
-                <div className="flex items-center">
-                    <i className="ri-book-2-line text-xl mr-2" style={{color: currentTheme.colors.accent}}></i>
-                    <span className="font-semibold">Engineer's Notes</span>
-                </div>
                 <div className="flex">
                     <button
                         className="p-1.5 rounded-full hover:bg-opacity-20 hover:bg-gray-500"

@@ -1,8 +1,8 @@
 // src/components/Properties/PropertiesPanel.tsx
-import React, {useEffect, useState} from 'react';
-import {IDockviewPanelProps} from 'dockview';
-import {Document} from '../../types/document';
-import {useSettings} from '../../contexts/SettingsContext';
+import React, { useEffect, useState, useRef } from 'react';
+import { IDockviewPanelProps } from 'dockview';
+import { Document } from '../../types/document';
+import { useSettings } from '../../contexts/SettingsContext';
 import 'remixicon/fonts/remixicon.css';
 
 interface PropertiesPanelProps {
@@ -11,20 +11,104 @@ interface PropertiesPanelProps {
 }
 
 const PropertiesPanel: React.FC<IDockviewPanelProps<PropertiesPanelProps>> = (props) => {
-    const {params} = props;
-    const {document, onUpdateTitle} = params;
-    const {currentTheme} = useSettings();
-    const [isEditing, setIsEditing] = useState<Record<string, boolean>>({});
-    const [editingTitle, setEditingTitle] = useState('');
-    const [tagsInput, setTagsInput] = useState('');
+    const { params } = props;
+    const { document, onUpdateTitle } = params;
+    const { currentTheme } = useSettings();
 
-    // Update local title state when document changes
+    const [editingTitle, setEditingTitle] = useState('');
+    const [isTitleFocused, setIsTitleFocused] = useState(false);
+    const [tagsInput, setTagsInput] = useState('');
+    const [isTagsEditing, setIsTagsEditing] = useState(false);
+    const titleInputRef = useRef<HTMLInputElement>(null);
+
+    // Update local state when document changes
     useEffect(() => {
         if (document) {
             setEditingTitle(document.title);
             setTagsInput(document.tags?.join(', ') || '');
         }
-    }, [document?.id, document?.title]);
+    }, [document?.id, document?.title, document?.tags]);
+
+    // Handle title click to edit
+    const handleTitleClick = () => {
+        if (document) {
+            setIsTitleFocused(true);
+            // Focus the input after state update
+            setTimeout(() => {
+                if (titleInputRef.current) {
+                    titleInputRef.current.focus();
+                    titleInputRef.current.select();
+                }
+            }, 0);
+        }
+    };
+
+    // Handle title input change
+    const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setEditingTitle(e.target.value);
+    };
+
+    // Handle title update when user finishes editing
+    const handleTitleBlur = () => {
+        if (document && editingTitle.trim() !== '') {
+            onUpdateTitle(editingTitle);
+        } else if (document) {
+            // Reset to original if empty
+            setEditingTitle(document.title);
+        }
+        setIsTitleFocused(false);
+    };
+
+    // Handle key press in title input
+    const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            if (document && editingTitle.trim() !== '') {
+                onUpdateTitle(editingTitle);
+            }
+            setIsTitleFocused(false);
+        } else if (e.key === 'Escape') {
+            // Reset to original title and exit editing mode
+            if (document) {
+                setEditingTitle(document.title);
+            }
+            setIsTitleFocused(false);
+        }
+    };
+
+    // Handle tags input
+    const handleTagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setTagsInput(e.target.value);
+    };
+
+    // Handle tags editing
+    const toggleTagsEditing = () => {
+        setIsTagsEditing(!isTagsEditing);
+        // Focus the tags input after opening it
+        if (!isTagsEditing && document) {
+            setTimeout(() => {
+                const tagsInput = document.querySelector('#tags-input') as HTMLInputElement;
+                if (tagsInput) {
+                    tagsInput.focus();
+                }
+            }, 0);
+        }
+    };
+
+    // Get file icon based on document type
+    const getFileIcon = (doc: Document) => {
+        if (doc.type === 'text') return 'ri-file-text-line';
+        if (doc.type === 'markdown') return 'ri-markdown-line';
+
+        // Code files
+        switch (doc.language) {
+            case 'javascript': return 'ri-javascript-line';
+            case 'typescript': return 'ri-code-s-slash-line';
+            case 'python': return 'ri-code-line';
+            case 'html': return 'ri-html5-line';
+            case 'css': return 'ri-css3-line';
+            default: return 'ri-file-code-line';
+        }
+    };
 
     // Format date for display
     const formatDate = (date: Date) => {
@@ -35,68 +119,6 @@ const PropertiesPanel: React.FC<IDockviewPanelProps<PropertiesPanelProps>> = (pr
             hour: '2-digit',
             minute: '2-digit'
         });
-    };
-
-    // Toggle editing state for a field
-    const toggleEditing = (field: string) => {
-        if (field === 'title' && !isEditing.title) {
-            // When starting to edit, set the editing title to the current document title
-            setEditingTitle(document?.title || '');
-        }
-
-        if (field === 'title' && isEditing.title) {
-            // When finishing editing, update the document title
-            handleTitleUpdate();
-        }
-
-        if (field === 'tags' && !isEditing.tags) {
-            // When starting to edit tags, initialize the input
-            setTagsInput(document?.tags?.join(', ') || '');
-        }
-
-        if (field === 'tags' && isEditing.tags) {
-            // When finishing editing tags, process them
-            // This is just a placeholder - actual tag updating would need to be implemented
-            // const newTags = tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
-            // Update document tags logic would go here
-        }
-
-        setIsEditing(prev => ({
-            ...prev,
-            [field]: !prev[field]
-        }));
-    };
-
-    // Handle title input change
-    const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setEditingTitle(e.target.value);
-    };
-
-    // Handle title update
-    const handleTitleUpdate = () => {
-        if (document && editingTitle.trim() !== '') {
-            onUpdateTitle(editingTitle);
-        }
-    };
-
-    // Handle key press in title input
-    const handleTitleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            handleTitleUpdate();
-            toggleEditing('title');
-        } else if (e.key === 'Escape') {
-            // Reset to original title and exit editing mode
-            setEditingTitle(document?.title || '');
-            setIsEditing(prev => ({
-                ...prev,
-                title: false
-            }));
-        }
-    };
-
-    // Handle tags input change
-    const handleTagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setTagsInput(e.target.value);
     };
 
     // Get word count from document content
@@ -112,201 +134,228 @@ const PropertiesPanel: React.FC<IDockviewPanelProps<PropertiesPanelProps>> = (pr
     if (!document) {
         return (
             <div
-                className="flex flex-col items-center justify-center h-full p-6 text-center"
-                style={{color: currentTheme.colors.foreground}}
+                className="flex flex-col items-center justify-center h-full p-4 text-center"
+                style={{ color: currentTheme.colors.foreground }}
             >
-                <i className="ri-file-info-line text-5xl mb-4 opacity-30"></i>
-                <p className="text-lg font-medium mb-2">No document selected</p>
+                <i className="ri-file-info-line text-4xl mb-3 opacity-50"></i>
+                <p className="text-base font-medium mb-1">No document selected</p>
                 <p className="text-sm opacity-60">Select a document to view its properties</p>
             </div>
         );
     }
 
     return (
-        <div className="flex flex-col border-t-4 border-t-blue-gray-300 properties-container justify-between">
-            {/* Document title */}
-            <div className="flex flex-col max-h-1/2">
-                <div className="flex flex-col property-group mb-4">
-                    <div className="flex justify-between items-center mb-1">
-                        <label className="text-sm font-medium opacity-70">Title</label>
-                        <button
-                            className="text-xs p-1 rounded-full hover:bg-opacity-10 hover:bg-gray-500"
-                            onClick={() => toggleEditing('title')}
-                            title={isEditing.title ? "Save" : "Edit title"}
-                        >
-                            <i className={`ri-${isEditing.title ? 'check-line' : 'pencil-line'}`}></i>
-                        </button>
-                    </div>
-                    {isEditing.title ? (
+        <div className="overflow-auto p-3" style={{ backgroundColor: currentTheme.colors.sidebar }}>
+            {/* Document title with inline editing */}
+            <div className="mb-3">
+                <div className="flex items-center mb-1">
+                    <i className={`${getFileIcon(document)} mr-2 text-lg`} style={{ color: currentTheme.colors.accent }}></i>
+                    {isTitleFocused ? (
                         <input
+                            ref={titleInputRef}
                             type="text"
                             value={editingTitle}
                             onChange={handleTitleChange}
-                            className="w-full p-2 rounded border text-sm"
+                            onBlur={handleTitleBlur}
+                            onKeyDown={handleTitleKeyDown}
+                            className="w-full py-1 px-2 rounded border text-base font-medium"
                             style={{
                                 backgroundColor: currentTheme.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
                                 borderColor: currentTheme.colors.border,
                                 color: currentTheme.colors.foreground
                             }}
                             autoFocus
-                            onBlur={() => toggleEditing('title')}
-                            onKeyDown={handleTitleKeyDown}
                         />
                     ) : (
                         <div
-                            className="p-2 rounded text-sm font-medium overflow-hidden text-ellipsis"
-                            style={{
-                                backgroundColor: currentTheme.isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)',
-                            }}
+                            className="w-full py-1 px-2 rounded text-base font-medium cursor-text hover:bg-opacity-10 hover:bg-gray-500 truncate"
+                            onClick={handleTitleClick}
+                            title="Click to edit title"
                         >
                             {document.title}
                         </div>
                     )}
                 </div>
 
-                {/* Document type and language */}
-                <div className="flex flex-col property-group mb-4">
-                    <div className="flex justify-between items-center mb-1">
-                        <label className="text-sm font-medium opacity-70">Type</label>
+                {/* Type and language badges */}
+                <div className="flex items-center gap-2 mb-3 mt-2">
+                    <div
+                        className="px-2 py-1 rounded-full text-xs font-medium"
+                        style={{
+                            backgroundColor: currentTheme.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                            color: currentTheme.colors.foreground
+                        }}
+                    >
+                        {document.type.charAt(0).toUpperCase() + document.type.slice(1)}
                     </div>
-                    <div className="flex items-center">
+
+                    {document.language && (
                         <div
-                            className="px-3 py-1.5 rounded text-sm font-medium"
+                            className="px-2 py-1 rounded-full text-xs font-medium"
                             style={{
-                                backgroundColor: currentTheme.isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)',
+                                backgroundColor: `${currentTheme.colors.accent}20`,
+                                color: currentTheme.colors.accent
                             }}
                         >
-                            <i className={`mr-2 ${
-                                document.type === 'text' ? 'ri-file-text-line' :
-                                    document.type === 'markdown' ? 'ri-markdown-line' :
-                                        'ri-file-code-line'
-                            }`}></i>
-                            {document.type.charAt(0).toUpperCase() + document.type.slice(1)}
+                            {document.language.charAt(0).toUpperCase() + document.language.slice(1)}
                         </div>
-                        {document.type === 'code' && document.language && (
-                            <div
-                                className="ml-2 px-3 py-1.5 rounded text-sm font-medium"
-                                style={{
-                                    backgroundColor: `${currentTheme.colors.accent}20`,
-                                    color: currentTheme.colors.accent
-                                }}
-                            >
-                                <i className={`mr-2 ${
-                                    document.language === 'javascript' ? 'ri-javascript-line' :
-                                        document.language === 'typescript' ? 'ri-code-s-slash-line' :
-                                            document.language === 'python' ? 'ri-code-line' :
-                                                document.language === 'html' ? 'ri-html5-line' :
-                                                    document.language === 'css' ? 'ri-css3-line' :
-                                                        'ri-code-line'
-                                }`}></i>
-                                {document.language.charAt(0).toUpperCase() + document.language.slice(1)}
+                    )}
+
+                    <div className="ml-auto text-xs opacity-60">
+                        {getWordCount(document.content)} words
+                    </div>
+                </div>
+            </div>
+
+            {/* Expandable sections using details/summary for clean UI */}
+            <div className="space-y-2">
+                {/* Statistics section */}
+                <details className="group" open>
+                    <summary
+                        className="font-medium flex items-center cursor-pointer py-1.5 pl-1 rounded-sm hover:bg-opacity-10 hover:bg-gray-500"
+                        style={{ color: currentTheme.colors.foreground }}
+                    >
+                        <i className="ri-bar-chart-2-line mr-2 text-base" style={{ color: currentTheme.colors.accent }}></i>
+                        <span>Statistics</span>
+                        <i className="ri-arrow-down-s-line ml-auto transform transition-transform group-open:rotate-180"></i>
+                    </summary>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2 pl-6">
+                        <div>
+                            <div className="text-xs opacity-70">Words</div>
+                            <div className="text-sm">{getWordCount(document.content)}</div>
+                        </div>
+                        <div>
+                            <div className="text-xs opacity-70">Characters</div>
+                            <div className="text-sm">{getCharCount(document.content)}</div>
+                        </div>
+                        <div>
+                            <div className="text-xs opacity-70">Created</div>
+                            <div className="text-sm">{formatDate(document.createdAt)}</div>
+                        </div>
+                        <div>
+                            <div className="text-xs opacity-70">Modified</div>
+                            <div className="text-sm">{formatDate(document.updatedAt)}</div>
+                        </div>
+                    </div>
+                </details>
+
+                {/* Tags section */}
+                <details className="group">
+                    <summary
+                        className="font-medium flex items-center cursor-pointer py-1.5 pl-1 rounded-sm hover:bg-opacity-10 hover:bg-gray-500"
+                        style={{ color: currentTheme.colors.foreground }}
+                    >
+                        <i className="ri-price-tag-3-line mr-2 text-base" style={{ color: currentTheme.colors.accent }}></i>
+                        <span>Tags</span>
+                        <i className="ri-arrow-down-s-line ml-auto transform transition-transform group-open:rotate-180"></i>
+                    </summary>
+                    <div className="mt-2 pl-6">
+                        {isTagsEditing ? (
+                            <div className="flex flex-col">
+                                <input
+                                    id="tags-input"
+                                    type="text"
+                                    placeholder="Add tags separated by commas"
+                                    value={tagsInput}
+                                    onChange={handleTagsChange}
+                                    className="w-full p-1.5 rounded border text-sm"
+                                    style={{
+                                        backgroundColor: currentTheme.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+                                        borderColor: currentTheme.colors.border,
+                                        color: currentTheme.colors.foreground
+                                    }}
+                                />
+                                <div className="flex mt-2 gap-2">
+                                    <button
+                                        className="px-2 py-1 text-xs rounded flex items-center"
+                                        style={{
+                                            backgroundColor: `${currentTheme.colors.accent}20`,
+                                            color: currentTheme.colors.accent
+                                        }}
+                                        onClick={toggleTagsEditing}
+                                    >
+                                        <i className="ri-check-line mr-1"></i> Save
+                                    </button>
+                                    <button
+                                        className="px-2 py-1 text-xs rounded flex items-center"
+                                        style={{
+                                            backgroundColor: currentTheme.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
+                                        }}
+                                        onClick={toggleTagsEditing}
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div>
+                                <div className="flex flex-wrap gap-1.5 mb-2">
+                                    {document.tags && document.tags.length > 0 ? (
+                                        document.tags.map((tag, index) => (
+                                            <span
+                                                key={index}
+                                                className="px-2 py-0.5 rounded-full text-xs inline-flex items-center"
+                                                style={{
+                                                    backgroundColor: `${currentTheme.colors.accent}15`,
+                                                    color: currentTheme.colors.accent
+                                                }}
+                                            >
+                        {tag}
+                      </span>
+                                        ))
+                                    ) : (
+                                        <span className="text-sm opacity-60">No tags</span>
+                                    )}
+                                </div>
+                                <button
+                                    className="text-xs flex items-center opacity-70 hover:opacity-100"
+                                    onClick={toggleTagsEditing}
+                                >
+                                    <i className="ri-edit-line mr-1"></i> Edit tags
+                                </button>
                             </div>
                         )}
                     </div>
-                </div>
+                </details>
 
-                {/* Document statistics */}
-                <div className="flex flex-col  property-group mb-4">
-                    <div className="flex justify-between items-center mb-1">
-                        <label className="text-sm font-medium opacity-70">Statistics</label>
-                    </div>
-                    <div
-                        className="p-3 rounded grid grid-cols-2 gap-3"
-                        style={{
-                            backgroundColor: currentTheme.isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)',
-                        }}
+                {/* Actions section */}
+                <details className="group">
+                    <summary
+                        className="font-medium flex items-center cursor-pointer py-1.5 pl-1 rounded-sm hover:bg-opacity-10 hover:bg-gray-500"
+                        style={{ color: currentTheme.colors.foreground }}
                     >
-                        <div>
-                            <div className="text-xs opacity-60 mb-1">Words</div>
-                            <div className="text-sm font-medium">{getWordCount(document.content)}</div>
-                        </div>
-                        <div>
-                            <div className="text-xs opacity-60 mb-1">Characters</div>
-                            <div className="text-sm font-medium">{getCharCount(document.content)}</div>
-                        </div>
-                        <div>
-                            <div className="text-xs opacity-60 mb-1">Created</div>
-                            <div className="text-sm font-medium">{formatDate(document.createdAt)}</div>
-                        </div>
-                        <div>
-                            <div className="text-xs opacity-60 mb-1">Modified</div>
-                            <div className="text-sm font-medium">{formatDate(document.updatedAt)}</div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Document tags */}
-                <div className="flex flex-col property-group mb-4">
-                    <div className="flex justify-between items-center mb-1">
-                        <label className="text-sm font-medium opacity-70">Tags</label>
+                        <i className="ri-tools-line mr-2 text-base" style={{ color: currentTheme.colors.accent }}></i>
+                        <span>Actions</span>
+                        <i className="ri-arrow-down-s-line ml-auto transform transition-transform group-open:rotate-180"></i>
+                    </summary>
+                    <div className="mt-2 pl-6 space-y-2">
                         <button
-                            className="text-xs p-1 rounded-full hover:bg-opacity-10 hover:bg-gray-500"
-                            onClick={() => toggleEditing('tags')}
-                            title={isEditing.tags ? "Save" : "Edit tags"}
+                            className="w-full p-1.5 rounded text-sm flex items-center justify-center"
+                            style={{
+                                backgroundColor: `${currentTheme.colors.accent}15`,
+                                color: currentTheme.colors.accent
+                            }}
                         >
-                            <i className={`ri-${isEditing.tags ? 'check-line' : 'price-tag-3-line'}`}></i>
+                            <i className="ri-download-line mr-1.5"></i> Export
+                        </button>
+                        <button
+                            className="w-full p-1.5 rounded text-sm flex items-center justify-center"
+                            style={{
+                                backgroundColor: currentTheme.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'
+                            }}
+                        >
+                            <i className="ri-share-line mr-1.5"></i> Share
+                        </button>
+                        <button
+                            className="w-full p-1.5 rounded text-sm flex items-center justify-center"
+                            style={{
+                                backgroundColor: currentTheme.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'
+                            }}
+                        >
+                            <i className="ri-clipboard-line mr-1.5"></i> Copy Content
                         </button>
                     </div>
-                    {isEditing.tags ? (
-                        <div className="flex flex-col">
-                            <input
-                                type="text"
-                                placeholder="Add tags separated by commas"
-                                value={tagsInput}
-                                onChange={handleTagsChange}
-                                className="w-full p-2 rounded border text-sm mb-1"
-                                style={{
-                                    backgroundColor: currentTheme.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
-                                    borderColor: currentTheme.colors.border,
-                                    color: currentTheme.colors.foreground
-                                }}
-                                autoFocus
-                                onBlur={() => toggleEditing('tags')}
-                                // This is just a placeholder - actual tag updating would need to be implemented
-                            />
-                            <div className="text-xs opacity-60 mt-1">Press Enter to save</div>
-                        </div>
-                    ) : (
-                        <div className="flex flex-wrap gap-1">
-                            {document.tags && document.tags.length > 0 ? (
-                                document.tags.map((tag, index) => (
-                                    <span
-                                        key={index}
-                                        className="px-2 py-1 rounded text-xs font-medium"
-                                        style={{
-                                            backgroundColor: `${currentTheme.colors.accent}15`,
-                                            color: currentTheme.colors.accent
-                                        }}
-                                    >
-                  <i className="ri-price-tag-3-line mr-1"></i>
-                                        {tag}
-                </span>
-                                ))
-                            ) : (
-                                <div className="p-2 text-sm opacity-60">No tags</div>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </div>
-            {/* Export options */}
-            <div className="flex gap-2">
-                <button
-                    className="flex-1 p-2 rounded text-sm font-medium flex items-center justify-center"
-                    style={{
-                        backgroundColor: currentTheme.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
-                    }}
-                >
-                    <i className="ri-download-line mr-1"></i> Export
-                </button>
-                <button
-                    className="flex-1 p-2 rounded text-sm font-medium flex items-center justify-center"
-                    style={{
-                        backgroundColor: currentTheme.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
-                    }}
-                >
-                    <i className="ri-share-line mr-1"></i> Share
-                </button>
+                </details>
             </div>
         </div>
     );

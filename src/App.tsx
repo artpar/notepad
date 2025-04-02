@@ -79,22 +79,40 @@ function App() {
     const updateDocumentTitle = useCallback((title: string) => {
         if (!activeDoc) return;
 
+        // Create updated document
         const updatedDoc = {
             ...activeDoc,
             title,
             updatedAt: new Date()
         };
 
-        saveDocument(updatedDoc);
+        // Save document first to ensure data consistency
+        saveDocument(updatedDoc).then(() => {
+            // Update the document list to reflect title change
+            setDocuments(prevDocs =>
+                prevDocs.map(doc =>
+                    doc.id === activeDoc.id ? { ...doc, title, updatedAt: new Date() } : doc
+                )
+            );
 
-        // Update panel title if it exists
-        saveLayout();
-        if (dockviewApi) {
-            const panel = dockviewApi.getPanel(`editor-${activeDoc.id}`);
-            if (panel) {
-                panel.setTitle(title);
+            // Update panel title if it exists
+            if (dockviewApi) {
+                // Update the editor panel
+                const editorPanel = dockviewApi.getPanel(`editor-${activeDoc.id}`);
+                if (editorPanel) {
+                    editorPanel.setTitle(title);
+                }
+
+                // Also update any preview panels that might exist
+                const previewPanel = dockviewApi.getPanel(`preview-${activeDoc.id}`);
+                if (previewPanel) {
+                    previewPanel.setTitle(`Preview: ${title}`);
+                }
             }
-        }
+
+            // Save the updated layout
+            saveLayout();
+        });
     }, [activeDoc, dockviewApi, saveDocument, saveLayout]);
 
     // Delete a document

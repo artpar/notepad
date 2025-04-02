@@ -54,7 +54,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
 
                 <div className="flex items-center">
                     <i className="ri-quill-pen-line text-xl mr-2" style={{color: currentTheme.colors.accent}}></i>
-                    <h1 className="text-lg font-bold" style={{color: currentTheme.colors.headerText}}>Engineer's Notepad</h1>
+                    <h4 className="text-lg font-bold" style={{color: currentTheme.colors.headerText}}>Engineer's Notepad</h4>
                 </div>
             </div>
 
