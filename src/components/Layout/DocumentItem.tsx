@@ -76,11 +76,11 @@ const DocumentItem: React.FC<DocumentItemProps> = memo(({
   };
 
   // Get document type display text
-  const getDocumentTypeDisplay = (doc: Document) => {
+  const getDocumentTypeDisplay = (doc: Document): string => {
     if (doc.type === 'code' && doc.language) {
       return doc.language;
     }
-    return doc.type;
+    return doc.type.type;
   };
 
   if (viewMode === 'grid') {
