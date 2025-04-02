@@ -503,21 +503,28 @@ function AppContent() {
         if (dockviewApi) {
             saveLayoutRef.current = async () => {
                 try {
+                    // Don't set global isLoading - this affects the entire app
+                    // Instead, we'll track saving state at the document level
+                    
                     // First save all dirty documents
                     const dirtyDocIds = Object.entries(documentStates)
                         .filter(([, state]) => state.isDirty)
                         .map(([id]) => parseInt(id));
                     
                     // Save each dirty document
-                    for (const id of dirtyDocIds) {
+                    const savePromises = dirtyDocIds.map(id => {
                         const doc = documents.find(d => d.id === id);
                         if (doc) {
-                            await saveDocument(doc);
+                            return saveDocument(doc);
                         }
-                    }
+                        return Promise.resolve();
+                    });
+                    
+                    // Wait for all documents to save
+                    await Promise.all(savePromises);
                     
                     // Then save the layout
-                    LayoutService.saveLayout(dockviewApi);
+                    await LayoutService.saveLayout(dockviewApi);
                     
                     // Show success toast when layout is explicitly saved (not auto-saved)
                     showToast('Layout saved successfully', {
@@ -693,12 +700,8 @@ function AppContent() {
                 {/* Sidebar - conditionally rendered based on showSidebar state */}
                 {showSidebar && (
                     <Sidebar
-                        documents={documents}
-                        activeDoc={activeDocument}
+                        onToggleSidebar={toggleSidebar}
                         onSelectDocument={openDocument}
-                        onCreateDocument={createDocument}
-                        onDeleteDocument={deleteDocument}
-                        onUpdateTitle={updateDocumentTitle}
                     />
                 )}
 

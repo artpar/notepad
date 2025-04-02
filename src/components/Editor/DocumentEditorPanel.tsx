@@ -1,5 +1,5 @@
 // src/components/Editor/DocumentEditorPanel.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { IDockviewPanelProps } from 'dockview';
 import DocumentEditor from './DocumentEditor';
 import { Document } from '../../types/document';
@@ -20,13 +20,30 @@ const DocumentEditorPanel: React.FC<IDockviewPanelProps<DocumentEditorPanelProps
 
     // Track if document has unsaved changes
     const [isDirty, setIsDirty] = useState(false);
+    
+    // Create a local copy of the document to prevent issues during saving
+    const [localDocument, setLocalDocument] = useState(document);
+    
+    // Update local document when the source document changes
+    useEffect(() => {
+        if (document) {
+            setLocalDocument(document);
+        }
+    }, [document]);
 
     // Handle content updates
     const handleContentChange = (content: string) => {
         if (typeof onUpdate === 'function') {
             // Only mark as dirty if content actually changed
-            if (content !== document.content) {
+            if (content !== localDocument.content) {
                 setIsDirty(true);
+                
+                // Update local document immediately for responsive UI
+                setLocalDocument(prev => ({
+                    ...prev,
+                    content,
+                    updatedAt: new Date()
+                }));
             }
 
             // Call the update function
@@ -57,7 +74,7 @@ const DocumentEditorPanel: React.FC<IDockviewPanelProps<DocumentEditorPanelProps
     return (
         <div className="h-full" onKeyDown={handleKeyDown}>
             <DocumentEditor
-                document={document}
+                document={localDocument}
                 onUpdate={handleContentChange}
                 showInfo={settings.editor.showStatistics}
             />

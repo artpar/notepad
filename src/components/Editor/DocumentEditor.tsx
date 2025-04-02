@@ -18,22 +18,31 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
                                                            document, onUpdate, readOnly = false, showInfo = false
                                                        }) => {
     const {settings, currentTheme} = useSettings();
-    const [stats, setStats] = useState(calculateDocumentStats(document.content));
+    const [stats, setStats] = useState(document && document.content ? calculateDocumentStats(document.content) : { wordCount: 0, characterCount: 0, lineCount: 0, readingTimeMinutes: 0 });
     const {showToast} = useToast();
-    const [lastSaved, setLastSaved] = useState<Date>(document.updatedAt);
+    const [lastSaved, setLastSaved] = useState<Date>(document?.updatedAt || new Date());
 
     // Map DocType to editor component
     const getEditorComponent = () => {
+        if (!document) {
+            // Return a placeholder or loading state if document is not available
+            return <div className="h-full flex items-center justify-center">Loading document...</div>;
+        }
+        
+        // Ensure document.content is always treated as a string
+        // This prevents issues when content might be null or undefined during saving
+        const content = document.content || '';
+        
         switch (document.type) {
             case 'markdown':
                 return (<MarkdownEditor
-                        content={document.content}
+                        content={content}
                         onChange={handleContentChange}
                     />);
 
             case 'richtext':
                 return (<RichTextEditor
-                        content={document.content}
+                        content={content}
                         onChange={handleContentChange}
                     />);
 
@@ -42,7 +51,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             case 'text':
             default:
                 return (<CodeEditor
-                        content={document.content}
+                        content={content}
                         language={document.type === 'html' ? 'html' : document.language || 'plaintext'}
                         onChange={handleContentChange}
                         readOnly={readOnly}
@@ -82,6 +91,16 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
         };
     }, [settings.editor.autoSave, settings.editor.autoSaveInterval, readOnly]);
 
+    // Update stats when document changes
+    useEffect(() => {
+        if (document && document.content && settings.editor.showStatistics) {
+            setStats(calculateDocumentStats(document.content));
+        }
+        if (document?.updatedAt) {
+            setLastSaved(document.updatedAt);
+        }
+    }, [document, settings.editor.showStatistics]);
+
     return (<div className="h-full flex flex-col">
             {/* Document editor */}
             <div className="flex-1 overflow-hidden">
@@ -89,7 +108,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             </div>
 
             {/* Info footer - optional */}
-            {showInfo && (<div
+            {showInfo && document && (<div
                     className="py-1 px-3 flex justify-between text-xs border-t"
                     style={{
                         backgroundColor: currentTheme.colors.sidebar,
