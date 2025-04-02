@@ -1,85 +1,72 @@
 // src/components/UI/SearchBar.tsx
-import React, { useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React from 'react';
 import { AppTheme } from '../../types/settings';
+import 'remixicon/fonts/remixicon.css';
 
 interface SearchBarProps {
     value: string;
     onChange: (value: string) => void;
+    onSearch?: () => void;
     placeholder?: string;
     theme: AppTheme;
-    autoFocus?: boolean;
 }
 
 const SearchBar: React.FC<SearchBarProps> = ({
                                                  value,
                                                  onChange,
+                                                 onSearch,
                                                  placeholder = 'Search...',
-                                                 theme,
-                                                 autoFocus = false
+                                                 theme
                                              }) => {
-    const inputRef = useRef<HTMLInputElement>(null);
-
-    useEffect(() => {
-        if (autoFocus && inputRef.current) {
-            inputRef.current.focus();
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && onSearch) {
+            onSearch();
         }
-    }, [autoFocus]);
+    };
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        onChange(e.target.value);
+    };
+
+    const handleClear = () => {
+        onChange('');
+    };
 
     return (
         <div className="relative">
-            <div
-                className="flex items-center rounded-md overflow-hidden transition-all focus-within:ring-2"
+            <input
+                type="text"
+                placeholder={placeholder}
+                className="w-full p-2 pl-8 pr-8 rounded border"
                 style={{
                     backgroundColor: theme.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
-                    border: `1px solid ${theme.colors.border}`,
-                    ringColor: theme.colors.accent
+                    borderColor: theme.colors.border,
+                    color: theme.colors.sidebarText
                 }}
+                value={value}
+                onChange={handleChange}
+                onKeyDown={handleKeyDown}
+            />
+
+            {/* Search icon */}
+            <div
+                className="absolute left-2 top-1/2 transform -translate-y-1/2"
+                style={{color: theme.isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)'}}
             >
-                <i className="ri-search-line text-lg mx-2 opacity-60"></i>
-                <input
-                    ref={inputRef}
-                    type="text"
-                    className="w-full py-2 px-1 text-sm border-none outline-none bg-transparent"
-                    placeholder={placeholder}
-                    value={value}
-                    onChange={(e) => onChange(e.target.value)}
-                />
-                <AnimatePresence>
-                    {value && (
-                        <motion.button
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.8 }}
-                            transition={{ duration: 0.15 }}
-                            className="px-2 opacity-60 hover:opacity-100"
-                            onClick={() => onChange('')}
-                            title="Clear search"
-                        >
-                            <i className="ri-close-line"></i>
-                        </motion.button>
-                    )}
-                </AnimatePresence>
+                <i className="ri-search-line"></i>
             </div>
 
-            {/* Optional search shortcuts/tags */}
-            <div className="flex mt-2 gap-1 flex-wrap">
-                {['markdown', 'code', 'recent'].map(tag => (
-                    <button
-                        key={tag}
-                        className="text-xs px-2 py-1 rounded-full transition-colors"
-                        style={{
-                            backgroundColor: theme.isDark
-                                ? 'rgba(255,255,255,0.1)'
-                                : 'rgba(0,0,0,0.05)',
-                            color: theme.colors.foreground
-                        }}
-                        onClick={() => onChange(`tag:${tag}`)}
-                    >
-                        #{tag}
-                    </button>
-                ))}
-            </div>
+            {/* Clear button (only show when there's text) */}
+            {value && (
+                <button
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 hover:bg-opacity-10 hover:bg-gray-500 rounded-full p-1"
+                    onClick={handleClear}
+                    title="Clear search"
+                    style={{color: theme.isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)'}}
+                >
+                    <i className="ri-close-line"></i>
+                </button>
+            )}
         </div>
     );
 };

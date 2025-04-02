@@ -1,8 +1,8 @@
 // src/components/Layout/DocumentItem.tsx
-import React, { useState } from 'react';
+import React from 'react';
 import { Document } from '../../types/document';
 import { AppTheme } from '../../types/settings';
-import { motion } from 'framer-motion';
+import 'remixicon/fonts/remixicon.css';
 
 interface DocumentItemProps {
     document: Document;
@@ -21,110 +21,97 @@ const DocumentItem: React.FC<DocumentItemProps> = ({
                                                        theme,
                                                        highlightText
                                                    }) => {
-    const [isHovered, setIsHovered] = useState(false);
-
     // Get file icon based on document type and language
-    const getFileIcon = (doc: Document): string => {
-        if (doc.type === 'text') return 'ri-file-text-line';
-        if (doc.type === 'markdown') return 'ri-markdown-line';
-
-        if (doc.type === 'code') {
-            switch (doc.language) {
-                case 'javascript': return 'ri-javascript-line';
-                case 'typescript': return 'ri-code-s-slash-line';
-                case 'python': return 'ri-code-line';
-                case 'html': return 'ri-html5-line';
-                case 'css': return 'ri-css3-line';
-                default: return 'ri-file-code-line';
-            }
-        }
-
-        // For javascript, python, html types directly on the document
+    const getFileIcon = (doc: Document) => {
         switch (doc.type) {
-            case 'javascript': return 'ri-javascript-line';
-            case 'python': return 'ri-code-line';
-            case 'html': return 'ri-html5-line';
+            case 'text':
+                return 'ri-file-text-line';
+            case 'markdown':
+                return 'ri-markdown-line';
+            case 'javascript':
+                return 'ri-javascript-line';
+            case 'python':
+                return 'ri-code-line';
+            case 'html':
+                return 'ri-html5-line';
+            default:
+                return 'ri-file-line';
         }
-
-        return 'ri-file-line';
     };
 
-    // Format relative time
-    const getRelativeTime = (date: Date): string => {
-        const now = new Date();
-        const diffMs = now.getTime() - new Date(date).getTime();
-        const diffSec = Math.floor(diffMs / 1000);
-        const diffMin = Math.floor(diffSec / 60);
-        const diffHour = Math.floor(diffMin / 60);
-        const diffDay = Math.floor(diffHour / 24);
-
-        if (diffSec < 60) return 'just now';
-        if (diffMin < 60) return `${diffMin}m ago`;
-        if (diffHour < 24) return `${diffHour}h ago`;
-        if (diffDay < 30) return `${diffDay}d ago`;
-
-        return new Date(date).toLocaleDateString();
+    // Get document type display text
+    const getDocumentTypeDisplay = (doc: Document) => {
+        if (doc.type === 'code' && doc.language) {
+            return doc.language;
+        }
+        return doc.type;
     };
 
-    // Highlight matching text
-    const highlightMatch = (text: string, query: string): React.ReactNode => {
-        if (!query || query.trim() === '') return text;
+    // Highlight matching text if highlightText is provided
+    const highlightMatchingText = (text: string) => {
+        if (!highlightText || !text) return text;
 
-        const parts = text.split(new RegExp(`(${query})`, 'gi'));
+        try {
+            const regex = new RegExp(`(${highlightText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+            const parts = text.split(regex);
 
-        return parts.map((part, index) =>
-            part.toLowerCase() === query.toLowerCase()
-                ? <mark key={index} className="bg-yellow-200 dark:bg-yellow-900 text-inherit px-0.5 rounded">{part}</mark>
-                : part
-        );
+            return parts.map((part, i) =>
+                    regex.test(part) ? (
+                        <span key={i} style={{ backgroundColor: `${theme.colors.accent}40`, padding: '0 2px', borderRadius: '2px' }}>
+            {part}
+          </span>
+                    ) : (
+                        part
+                    )
+            );
+        } catch (e) {
+            // If regex fails, just return the original text
+            return text;
+        }
     };
 
     return (
-        <motion.div
-            className={`p-2 rounded-md cursor-pointer group transition-all ${
-                isActive ? 'bg-opacity-20 bg-blue-500' : 'hover:bg-opacity-10 hover:bg-gray-500'
+        <div
+            className={`p-2 rounded cursor-pointer flex items-center group transition-colors ${
+                isActive ? 'bg-opacity-20 bg-gray-500' : 'hover:bg-opacity-10 hover:bg-gray-500'
             }`}
-            whileHover={{ x: 4 }}
-            whileTap={{ scale: 0.98 }}
             onClick={onClick}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
             style={{
-                borderLeft: isActive ? `3px solid ${theme.colors.accent}` : '3px solid transparent',
-                paddingLeft: isActive ? '7px' : '10px'
+                backgroundColor: isActive ?
+                    theme.isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)' :
+                    'transparent'
             }}
         >
-            <div className="flex items-center">
-                <i className={`${getFileIcon(document)} mr-2 text-lg`} style={{
-                    color: isActive ? theme.colors.accent : 'inherit'
-                }}></i>
-                <div className="overflow-hidden flex-grow">
-                    <div className="font-medium truncate">
-                        {highlightText
-                            ? highlightMatch(document.title, highlightText)
-                            : document.title
-                        }
-                    </div>
-                    <div className="flex items-center justify-between text-xs opacity-60">
-                        <span>
-                            {document.type === 'code' ? document.language : document.type}
-                        </span>
-                        <span>{getRelativeTime(document.updatedAt)}</span>
-                    </div>
-                </div>
+            <i
+                className={`mr-2 ${getFileIcon(document)}`}
+                style={{
+                    color: isActive ? theme.colors.accent : theme.colors.sidebarText
+                }}
+            />
 
-                {/* Delete button - only visible on hover or active */}
-                <motion.button
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: isHovered || isActive ? 1 : 0, scale: isHovered || isActive ? 1 : 0.8 }}
-                    className="ml-1 p-1.5 rounded-full hover:bg-red-500 hover:text-white transition-colors"
-                    onClick={onDelete}
-                    title="Delete document"
-                >
-                    <i className="ri-delete-bin-line"></i>
-                </motion.button>
-            </div>
-        </motion.div>
+            <span
+                className="truncate flex-1"
+                style={{color: theme.colors.sidebarText}}
+            >
+        {highlightText ? highlightMatchingText(document.title) : document.title}
+      </span>
+
+            <span
+                className="text-xs ml-1"
+                style={{color: theme.isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'}}
+            >
+        {getDocumentTypeDisplay(document)}
+      </span>
+
+            <button
+                className="opacity-0 group-hover:opacity-100 ml-1 p-1 rounded-full hover:bg-opacity-20 hover:bg-gray-500"
+                onClick={onDelete}
+                title="Delete document"
+                style={{color: theme.colors.sidebarText}}
+            >
+                <i className="ri-delete-bin-line text-sm"></i>
+            </button>
+        </div>
     );
 };
 

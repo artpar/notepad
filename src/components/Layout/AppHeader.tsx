@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useDocuments } from '../../contexts/DocumentContext';
-import { motion, AnimatePresence } from 'framer-motion';
 import 'remixicon/fonts/remixicon.css';
 
 interface AppHeaderProps {
@@ -34,13 +33,19 @@ const AppHeader: React.FC<AppHeaderProps> = ({
     return (
         <header className="app-header flex items-center justify-between p-2 border-b"
                 style={{
-                    backgroundColor: currentTheme.colors.sidebar,
+                    backgroundColor: currentTheme.colors.headerBackground,
+                    color: currentTheme.colors.headerText,
                     borderColor: currentTheme.colors.border
-                }}>
+                }}
+        >
             {/* Logo and sidebar toggle */}
             <div className="flex items-center">
                 <button
-                    className="p-2 rounded-md mr-2 hover:bg-opacity-10 hover:bg-gray-500 transition-colors"
+                    className="p-2 rounded-md mr-2 transition-colors"
+                    style={{
+                        color: currentTheme.colors.buttonText,
+                        hover: { backgroundColor: currentTheme.colors.buttonHover }
+                    }}
                     onClick={onToggleSidebar}
                     title={showSidebar ? "Hide Sidebar" : "Show Sidebar"}
                 >
@@ -49,7 +54,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
 
                 <div className="flex items-center">
                     <i className="ri-quill-pen-line text-xl mr-2" style={{color: currentTheme.colors.accent}}></i>
-                    <h1 className="text-lg font-bold">Engineer's Notepad</h1>
+                    <h1 className="text-lg font-bold" style={{color: currentTheme.colors.headerText}}>Engineer's Notepad</h1>
                 </div>
             </div>
 
@@ -62,8 +67,8 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                             activeDocument.type === 'javascript' ||
                             activeDocument.type === 'python' ||
                             activeDocument.type === 'html' ? 'code-line' :
-                                'file-text-line'} mr-2`}></i>
-                        <span className="font-medium">{activeDocument.title}</span>
+                                'file-text-line'} mr-2`} style={{color: currentTheme.colors.headerText}}></i>
+                        <span className="font-medium" style={{color: currentTheme.colors.headerText}}>{activeDocument.title}</span>
                     </div>
                 )}
             </div>
@@ -73,7 +78,11 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                 {/* New document button */}
                 <div className="relative">
                     <button
-                        className="p-2 rounded-md hover:bg-opacity-10 hover:bg-gray-500 transition-colors flex items-center"
+                        className="p-2 rounded-md transition-colors flex items-center"
+                        style={{
+                            color: currentTheme.colors.buttonText,
+                            backgroundColor: showCreateMenu ? currentTheme.colors.buttonActiveBackground : 'transparent'
+                        }}
                         onClick={() => setShowCreateMenu(!showCreateMenu)}
                         title="Create New Document"
                     >
@@ -81,47 +90,50 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                         <span className="hidden sm:inline">New</span>
                     </button>
 
-                    <AnimatePresence>
-                        {showCreateMenu && (
-                            <motion.div
-                                initial={{ opacity: 0, y: -10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                transition={{ duration: 0.2 }}
-                                className="absolute right-0 mt-1 w-60 bg-white dark:bg-gray-800 rounded-md shadow-lg z-50 border overflow-hidden"
-                                style={{ borderColor: currentTheme.colors.border }}
-                            >
-                                <div className="p-2 border-b" style={{ borderColor: currentTheme.colors.border }}>
-                                    <h3 className="font-medium">Create New Document</h3>
-                                </div>
+                    {showCreateMenu && (
+                        <div
+                            className="absolute right-0 mt-1 w-60 rounded-md shadow-lg z-50 border overflow-hidden"
+                            style={{
+                                backgroundColor: currentTheme.colors.background,
+                                borderColor: currentTheme.colors.border,
+                                color: currentTheme.colors.foreground
+                            }}
+                        >
+                            <div className="p-2 border-b" style={{ borderColor: currentTheme.colors.border }}>
+                                <h3 className="font-medium">Create New Document</h3>
+                            </div>
 
-                                <div className="py-1">
-                                    {[
-                                        { type: 'text', label: 'Plain Text', icon: 'ri-file-text-line', description: 'Simple text document' },
-                                        { type: 'markdown', label: 'Markdown', icon: 'ri-markdown-line', description: 'Format with Markdown syntax' },
-                                        { type: 'javascript', label: 'JavaScript', icon: 'ri-javascript-line', description: 'JavaScript code' },
-                                        { type: 'python', label: 'Python', icon: 'ri-code-line', description: 'Python code' },
-                                        { type: 'html', label: 'HTML', icon: 'ri-html5-line', description: 'HTML document' }
-                                    ].map(item => (
-                                        <button
-                                            key={item.type}
-                                            className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-start gap-3"
-                                            onClick={() => {
-                                                createDocument(item.type as any);
-                                                setShowCreateMenu(false);
-                                            }}
-                                        >
-                                            <i className={`${item.icon} text-xl mt-0.5`} style={{color: currentTheme.colors.accent}}></i>
-                                            <div>
-                                                <div className="font-medium">{item.label}</div>
-                                                <div className="text-xs opacity-60">{item.description}</div>
-                                            </div>
-                                        </button>
-                                    ))}
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+                            <div className="py-1">
+                                {[
+                                    { type: 'text', label: 'Plain Text', icon: 'ri-file-text-line', description: 'Simple text document' },
+                                    { type: 'markdown', label: 'Markdown', icon: 'ri-markdown-line', description: 'Format with Markdown syntax' },
+                                    { type: 'javascript', label: 'JavaScript', icon: 'ri-javascript-line', description: 'JavaScript code' },
+                                    { type: 'python', label: 'Python', icon: 'ri-code-line', description: 'Python code' },
+                                    { type: 'html', label: 'HTML', icon: 'ri-html5-line', description: 'HTML document' }
+                                ].map(item => (
+                                    <button
+                                        key={item.type}
+                                        className="w-full text-left px-4 py-2 transition-colors flex items-start gap-3"
+                                        style={{
+                                            backgroundColor: currentTheme.colors.background,
+                                            color: currentTheme.colors.foreground,
+                                            hover: { backgroundColor: currentTheme.colors.buttonHover }
+                                        }}
+                                        onClick={() => {
+                                            createDocument(item.type as any);
+                                            setShowCreateMenu(false);
+                                        }}
+                                    >
+                                        <i className={`${item.icon} text-xl mt-0.5`} style={{color: currentTheme.colors.accent}}></i>
+                                        <div>
+                                            <div className="font-medium">{item.label}</div>
+                                            <div className="text-xs opacity-60">{item.description}</div>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Document actions - only show when document is active */}
@@ -129,7 +141,11 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                     <>
                         {/* Preview toggle */}
                         <button
-                            className="p-2 rounded-md hover:bg-opacity-10 hover:bg-gray-500 transition-colors flex items-center"
+                            className="p-2 rounded-md transition-colors flex items-center"
+                            style={{
+                                color: currentTheme.colors.buttonText,
+                                hover: { backgroundColor: currentTheme.colors.buttonHover }
+                            }}
                             onClick={onTogglePreview}
                             title={`Toggle Preview (${getShortcutKey('P')})`}
                         >
@@ -139,7 +155,11 @@ const AppHeader: React.FC<AppHeaderProps> = ({
 
                         {/* Export */}
                         <button
-                            className="p-2 rounded-md hover:bg-opacity-10 hover:bg-gray-500 transition-colors flex items-center"
+                            className="p-2 rounded-md transition-colors flex items-center"
+                            style={{
+                                color: currentTheme.colors.buttonText,
+                                hover: { backgroundColor: currentTheme.colors.buttonHover }
+                            }}
                             onClick={onExportDocument}
                             title={`Export Document (${getShortcutKey('E')})`}
                         >
@@ -151,7 +171,11 @@ const AppHeader: React.FC<AppHeaderProps> = ({
 
                 {/* Save layout */}
                 <button
-                    className="p-2 rounded-md hover:bg-opacity-10 hover:bg-gray-500 transition-colors flex items-center"
+                    className="p-2 rounded-md transition-colors flex items-center"
+                    style={{
+                        color: currentTheme.colors.buttonText,
+                        hover: { backgroundColor: currentTheme.colors.buttonHover }
+                    }}
                     onClick={onSaveLayout}
                     title={`Save Layout (${getShortcutKey('S')})`}
                 >
@@ -161,7 +185,11 @@ const AppHeader: React.FC<AppHeaderProps> = ({
 
                 {/* Theme toggle */}
                 <button
-                    className="p-2 rounded-md hover:bg-opacity-10 hover:bg-gray-500 transition-colors"
+                    className="p-2 rounded-md transition-colors"
+                    style={{
+                        color: currentTheme.colors.buttonText,
+                        hover: { backgroundColor: currentTheme.colors.buttonHover }
+                    }}
                     onClick={toggleTheme}
                     title="Toggle Light/Dark Theme"
                 >
@@ -171,74 +199,106 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                 {/* Help menu */}
                 <div className="relative">
                     <button
-                        className="p-2 rounded-md hover:bg-opacity-10 hover:bg-gray-500 transition-colors"
+                        className="p-2 rounded-md transition-colors"
+                        style={{
+                            color: currentTheme.colors.buttonText,
+                            backgroundColor: showHelpMenu ? currentTheme.colors.buttonActiveBackground : 'transparent'
+                        }}
                         onClick={() => setShowHelpMenu(!showHelpMenu)}
                         title="Help & Keyboard Shortcuts"
                     >
                         <i className="ri-question-line text-lg"></i>
                     </button>
 
-                    <AnimatePresence>
-                        {showHelpMenu && (
-                            <motion.div
-                                initial={{ opacity: 0, y: -10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                transition={{ duration: 0.2 }}
-                                className="absolute right-0 mt-1 w-80 bg-white dark:bg-gray-800 rounded-md shadow-lg z-50 border"
-                                style={{ borderColor: currentTheme.colors.border }}
-                            >
-                                <div className="p-3 border-b" style={{ borderColor: currentTheme.colors.border }}>
-                                    <h3 className="font-medium">Keyboard Shortcuts</h3>
+                    {showHelpMenu && (
+                        <div
+                            className="absolute right-0 mt-1 w-80 rounded-md shadow-lg z-50 border"
+                            style={{
+                                backgroundColor: currentTheme.colors.background,
+                                borderColor: currentTheme.colors.border,
+                                color: currentTheme.colors.foreground
+                            }}
+                        >
+                            <div className="p-3 border-b" style={{ borderColor: currentTheme.colors.border }}>
+                                <h3 className="font-medium">Keyboard Shortcuts</h3>
+                            </div>
+
+                            <div className="p-3">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <p className="text-sm font-medium mb-1">Document</p>
+                                        <ul className="text-xs space-y-2">
+                                            <li className="flex justify-between">
+                                                <span>New Document</span>
+                                                <span className="font-mono px-1 rounded"
+                                                      style={{
+                                                          backgroundColor: currentTheme.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'
+                                                      }}>
+                                                    {getShortcutKey('N')}
+                                                </span>
+                                            </li>
+                                            <li className="flex justify-between">
+                                                <span>Toggle Preview</span>
+                                                <span className="font-mono px-1 rounded"
+                                                      style={{
+                                                          backgroundColor: currentTheme.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'
+                                                      }}>
+                                                    {getShortcutKey('P')}
+                                                </span>
+                                            </li>
+                                            <li className="flex justify-between">
+                                                <span>Export Document</span>
+                                                <span className="font-mono px-1 rounded"
+                                                      style={{
+                                                          backgroundColor: currentTheme.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'
+                                                      }}>
+                                                    {getShortcutKey('E')}
+                                                </span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium mb-1">Workspace</p>
+                                        <ul className="text-xs space-y-2">
+                                            <li className="flex justify-between">
+                                                <span>Save Layout</span>
+                                                <span className="font-mono px-1 rounded"
+                                                      style={{
+                                                          backgroundColor: currentTheme.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'
+                                                      }}>
+                                                    {getShortcutKey('S')}
+                                                </span>
+                                            </li>
+                                            <li className="flex justify-between">
+                                                <span>Toggle Sidebar</span>
+                                                <span className="font-mono px-1 rounded"
+                                                      style={{
+                                                          backgroundColor: currentTheme.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'
+                                                      }}>
+                                                    {getShortcutKey('B')}
+                                                </span>
+                                            </li>
+                                            <li className="flex justify-between">
+                                                <span>Find in Document</span>
+                                                <span className="font-mono px-1 rounded"
+                                                      style={{
+                                                          backgroundColor: currentTheme.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'
+                                                      }}>
+                                                    {getShortcutKey('F')}
+                                                </span>
+                                            </li>
+                                        </ul>
+                                    </div>
                                 </div>
 
-                                <div className="p-3">
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <p className="text-sm font-medium mb-1">Document</p>
-                                            <ul className="text-xs space-y-2">
-                                                <li className="flex justify-between">
-                                                    <span>New Document</span>
-                                                    <span className="font-mono bg-gray-100 dark:bg-gray-700 px-1 rounded">{getShortcutKey('N')}</span>
-                                                </li>
-                                                <li className="flex justify-between">
-                                                    <span>Toggle Preview</span>
-                                                    <span className="font-mono bg-gray-100 dark:bg-gray-700 px-1 rounded">{getShortcutKey('P')}</span>
-                                                </li>
-                                                <li className="flex justify-between">
-                                                    <span>Export Document</span>
-                                                    <span className="font-mono bg-gray-100 dark:bg-gray-700 px-1 rounded">{getShortcutKey('E')}</span>
-                                                </li>
-                                            </ul>
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-medium mb-1">Workspace</p>
-                                            <ul className="text-xs space-y-2">
-                                                <li className="flex justify-between">
-                                                    <span>Save Layout</span>
-                                                    <span className="font-mono bg-gray-100 dark:bg-gray-700 px-1 rounded">{getShortcutKey('S')}</span>
-                                                </li>
-                                                <li className="flex justify-between">
-                                                    <span>Toggle Sidebar</span>
-                                                    <span className="font-mono bg-gray-100 dark:bg-gray-700 px-1 rounded">{getShortcutKey('B')}</span>
-                                                </li>
-                                                <li className="flex justify-between">
-                                                    <span>Find in Document</span>
-                                                    <span className="font-mono bg-gray-100 dark:bg-gray-700 px-1 rounded">{getShortcutKey('F')}</span>
-                                                </li>
-                                            </ul>
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-4 pt-3 border-t text-center" style={{ borderColor: currentTheme.colors.border }}>
-                                        <p className="text-xs opacity-70">
-                                            Engineer's Notepad v1.1.0 — A code-focused note-taking app
-                                        </p>
-                                    </div>
+                                <div className="mt-4 pt-3 border-t text-center" style={{ borderColor: currentTheme.colors.border }}>
+                                    <p className="text-xs opacity-70">
+                                        Engineer's Notepad v1.1.0 — A code-focused note-taking app
+                                    </p>
                                 </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </header>

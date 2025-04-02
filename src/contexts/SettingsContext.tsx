@@ -1,9 +1,9 @@
 // src/contexts/SettingsContext.tsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { AppSettings, AppTheme, EditorSettings } from '../types/settings';
+import { AppSettings, AppTheme, EditorSettings } from '../types/settings.ts';
 import * as StorageService from '../services/storage';
 
-// Default themes
+// Default themes with improved contrast
 const lightTheme: AppTheme = {
   name: 'light',
   displayName: 'Light',
@@ -14,7 +14,14 @@ const lightTheme: AppTheme = {
     foreground: '#333333',
     accent: '#4a7bab',
     sidebar: '#f5f5f5',
-    border: '#e0e0e0'
+    sidebarText: '#333333',
+    headerBackground: '#f5f5f5',
+    headerText: '#333333',
+    border: '#e0e0e0',
+    buttonHover: 'rgba(0, 0, 0, 0.05)',
+    buttonText: '#333333',
+    buttonActiveBackground: 'rgba(74, 123, 171, 0.15)',
+    buttonActiveText: '#4a7bab'
   }
 };
 
@@ -28,7 +35,14 @@ const darkTheme: AppTheme = {
     foreground: '#d4d4d4',
     accent: '#569cd6',
     sidebar: '#252526',
-    border: '#3e3e42'
+    sidebarText: '#d4d4d4',
+    headerBackground: '#252526',
+    headerText: '#d4d4d4',
+    border: '#3e3e42',
+    buttonHover: 'rgba(255, 255, 255, 0.1)',
+    buttonText: '#d4d4d4',
+    buttonActiveBackground: 'rgba(86, 156, 214, 0.15)',
+    buttonActiveText: '#569cd6'
   }
 };
 
@@ -78,7 +92,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const loadSettings = async () => {
       try {
         const storedSettings = await StorageService.getSettings();
-        
+
         // Map stored settings to our AppSettings type
         const appSettings: AppSettings = {
           id: storedSettings.id,
@@ -96,9 +110,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           autosaveInterval: storedSettings.autosaveInterval || defaultSettings.autosaveInterval,
           customKeybindings: storedSettings.customKeybindings
         };
-        
+
         setSettings(appSettings);
-        
+
         // Set the theme based on settings
         updateTheme(appSettings.theme);
       } catch (error) {
@@ -113,14 +127,14 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     if (settings.theme === 'system') {
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      
+
       const handleChange = (e: MediaQueryListEvent) => {
         setCurrentTheme(e.matches ? darkTheme : lightTheme);
       };
-      
+
       setCurrentTheme(mediaQuery.matches ? darkTheme : lightTheme);
       mediaQuery.addEventListener('change', handleChange);
-      
+
       return () => mediaQuery.removeEventListener('change', handleChange);
     }
   }, [settings.theme]);
@@ -139,11 +153,11 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const updateSettings = async (newSettings: Partial<AppSettings>): Promise<void> => {
     const updatedSettings = { ...settings, ...newSettings };
     setSettings(updatedSettings);
-    
+
     if (newSettings.theme) {
       updateTheme(newSettings.theme);
     }
-    
+
     // Map our settings to the storage format
     await StorageService.updateSettings({
       theme: updatedSettings.theme,
@@ -158,9 +172,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const updateEditorSettings = async (newEditorSettings: Partial<EditorSettings>): Promise<void> => {
     const updatedEditorSettings = { ...settings.editor, ...newEditorSettings };
     const updatedSettings = { ...settings, editor: updatedEditorSettings };
-    
+
     setSettings(updatedSettings);
-    
+
     // Map our settings to the storage format
     await StorageService.updateSettings({
       fontSize: updatedEditorSettings.fontSize,
@@ -171,7 +185,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const toggleTheme = async (): Promise<void> => {
     let newTheme: 'light' | 'dark' | 'system';
-    
+
     if (settings.theme === 'light') {
       newTheme = 'dark';
     } else if (settings.theme === 'dark') {
@@ -179,7 +193,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } else {
       newTheme = 'light';
     }
-    
+
     await updateSettings({ theme: newTheme });
   };
 
@@ -192,9 +206,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   return (
-    <SettingsContext.Provider value={value}>
-      {children}
-    </SettingsContext.Provider>
+      <SettingsContext.Provider value={value}>
+        {children}
+      </SettingsContext.Provider>
   );
 };
 
