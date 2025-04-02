@@ -1,10 +1,12 @@
 // src/components/Explorer/ExplorerPanel.tsx
-import React, {useMemo, useState} from 'react';
-import {IDockviewPanelProps} from 'dockview';
-import {Document} from '../../types/document';
-import {useSettings} from '../../contexts/SettingsContext';
+import React, { useMemo, useState, useCallback } from 'react';
+import { IDockviewPanelProps } from 'dockview';
+import { Document } from '../../types/document';
+import { useSettings } from '../../contexts/SettingsContext';
 import SearchBar from '../UI/SearchBar';
-import {AnimatePresence, motion} from 'framer-motion';
+import DocumentItem from '../Layout/DocumentItem';
+import ConfirmationModal from '../UI/ConfirmationModal';
+import { AnimatePresence, motion } from 'framer-motion';
 import 'remixicon/fonts/remixicon.css';
 
 type DocType = 'text' | 'markdown' | 'javascript' | 'python' | 'html';
@@ -13,16 +15,16 @@ interface ExplorerPanelProps {
     documents: Document[];
     onSelectDocument: (doc: Document) => void;
     onCreateDocument: (type: DocType) => void;
-    onDeleteDocument: (id: string) => void;
+    onDeleteDocument: (id: number) => void;
 }
 
 const ExplorerPanel: React.FC<IDockviewPanelProps<ExplorerPanelProps>> = (props) => {
-    const {params} = props;
-    const {documents, onSelectDocument, onCreateDocument, onDeleteDocument} = params;
-    const {currentTheme} = useSettings();
+    const { params } = props;
+    const { documents, onSelectDocument, onCreateDocument, onDeleteDocument } = params;
+    const { currentTheme } = useSettings();
     const [searchTerm, setSearchTerm] = useState('');
     const [createMenuOpen, setCreateMenuOpen] = useState(false);
-    const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+    const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
     const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
     const [filterTag, setFilterTag] = useState<string | null>(null);
     const [sortOption, setSortOption] = useState<'name' | 'date' | 'type'>('date');
@@ -98,25 +100,74 @@ const ExplorerPanel: React.FC<IDockviewPanelProps<ExplorerPanelProps>> = (props)
         }
     };
 
-    // Format relative time (e.g., "2 hours ago")
-    const getRelativeTime = (date: Date): string => {
-        const now = new Date();
-        const diffMs = now.getTime() - new Date(date).getTime();
-        const diffSec = Math.floor(diffMs / 1000);
-        const diffMin = Math.floor(diffSec / 60);
-        const diffHour = Math.floor(diffMin / 60);
-        const diffDay = Math.floor(diffHour / 24);
+    // Handle document deletion confirmation
+    const handleConfirmDelete = useCallback(() => {
+        if (documentToDelete && documentToDelete.id) {
+            onDeleteDocument(documentToDelete.id);
+            setDocumentToDelete(null);
+        }
+    }, [documentToDelete, onDeleteDocument]);
 
-        if (diffSec < 60) return 'just now';
-        if (diffMin < 60) return `${diffMin}m ago`;
-        if (diffHour < 24) return `${diffHour}h ago`;
-        if (diffDay < 30) return `${diffDay}d ago`;
+    // Handle document deletion cancellation
+    const handleCancelDelete = useCallback(() => {
+        setDocumentToDelete(null);
+    }, []);
 
-        return new Date(date).toLocaleDateString();
-    };
+    // Handle delete button click
+    const handleDeleteClick = useCallback((e: React.MouseEvent, doc: Document) => {
+        e.stopPropagation();
+        setDocumentToDelete(doc);
+    }, []);
+
+    // Update search term without immediately filtering
+    const handleSearchChange = useCallback((value: string) => {
+        setSearchTerm(value);
+    }, []);
+
+    // Toggle view mode
+    const toggleViewMode = useCallback(() => {
+        setViewMode(prev => prev === 'list' ? 'grid' : 'list');
+    }, []);
+
+    // Cycle through sort options
+    const cycleSortOption = useCallback(() => {
+        setSortOption(current => {
+            if (current === 'date') return 'name';
+            if (current === 'name') return 'type';
+            return 'date';
+        });
+    }, []);
+
+    // Render document item
+    const renderDocumentItem = useCallback((doc: Document) => {
+        return (
+            <DocumentItem
+                key={doc.id}
+                document={doc}
+                isActive={false} // This will be set by the parent component if needed
+                onClick={() => onSelectDocument(doc)}
+                onDelete={(e) => handleDeleteClick(e, doc)}
+                theme={currentTheme}
+                highlightText={searchTerm}
+            />
+        );
+    }, [currentTheme, handleDeleteClick, onSelectDocument, searchTerm]);
 
     return (
         <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-800 overflow-hidden">
+            {/* Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={documentToDelete !== null}
+                title="Delete Document"
+                message={`Are you sure you want to delete "${documentToDelete?.title}"? This action cannot be undone.`}
+                confirmLabel="Delete"
+                cancelLabel="Cancel"
+                isDestructive={true}
+                icon="ri-delete-bin-line"
+                onConfirm={handleConfirmDelete}
+                onCancel={handleCancelDelete}
+            />
+
             {/* Header with search and controls */}
             <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700">
                 <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Explorer</h3>
@@ -124,29 +175,20 @@ const ExplorerPanel: React.FC<IDockviewPanelProps<ExplorerPanelProps>> = (props)
                     {/* View mode toggle */}
                     <button
                         className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'}`}
-                        onClick={() => setViewMode('list')}
-                        title="List View"
+                        onClick={toggleViewMode}
+                        title="Toggle View Mode"
                     >
-                        <i className="ri-list-check"></i>
-                    </button>
-                    <button
-                        className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'}`}
-                        onClick={() => setViewMode('grid')}
-                        title="Grid View"
-                    >
-                        <i className="ri-grid-line"></i>
+                        <i className={`ri-${viewMode === 'list' ? 'list-check' : 'grid-line'}`}></i>
                     </button>
 
-                    {/* Sort dropdown */}
-                    <div className="relative">
-                        <button
-                            className="p-1.5 rounded text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                            onClick={() => setSortOption(sortOption === 'date' ? 'name' : sortOption === 'name' ? 'type' : 'date')}
-                            title="Change Sort Order"
-                        >
-                            <i className={`ri-${sortOption === 'date' ? 'time' : sortOption === 'name' ? 'sort-alpha' : 'file-list'}-line`}></i>
-                        </button>
-                    </div>
+                    {/* Sort button */}
+                    <button
+                        className="p-1.5 rounded text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        onClick={cycleSortOption}
+                        title={`Sorted by ${sortOption}`}
+                    >
+                        <i className={`ri-${sortOption === 'date' ? 'time' : sortOption === 'name' ? 'sort-alpha' : 'file-list'}-line`}></i>
+                    </button>
 
                     {/* Create new document button */}
                     <div className="relative">
@@ -198,7 +240,7 @@ const ExplorerPanel: React.FC<IDockviewPanelProps<ExplorerPanelProps>> = (props)
             <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
                 <SearchBar
                     value={searchTerm}
-                    onChange={setSearchTerm}
+                    onChange={handleSearchChange}
                     placeholder="Search documents..."
                     theme={currentTheme}
                 />
@@ -237,8 +279,7 @@ const ExplorerPanel: React.FC<IDockviewPanelProps<ExplorerPanelProps>> = (props)
                                 className="max-w-xs"
                             >
                                 <i className="ri-file-add-line text-5xl text-gray-300 dark:text-gray-600 mb-3"></i>
-                                <h4 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-2">No documents
-                                    yet</h4>
+                                <h4 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-2">No documents yet</h4>
                                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                                     Create your first document to get started with Engineer's Notepad
                                 </p>
@@ -258,7 +299,7 @@ const ExplorerPanel: React.FC<IDockviewPanelProps<ExplorerPanelProps>> = (props)
                     </div>
                 ) : viewMode === 'list' ? (
                     // List view
-                    <div className="py-1">
+                    <div className="py-1 space-y-1 px-2">
                         <AnimatePresence initial={false}>
                             {filteredDocuments.map(doc => (
                                 <motion.div
@@ -267,58 +308,8 @@ const ExplorerPanel: React.FC<IDockviewPanelProps<ExplorerPanelProps>> = (props)
                                     animate={{opacity: 1, y: 0}}
                                     exit={{opacity: 0, height: 0}}
                                     transition={{duration: 0.2}}
-                                    className="group"
                                 >
-                                    <div
-                                        className="flex items-center px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer relative"
-                                        onClick={() => confirmDelete !== doc.id && onSelectDocument(doc)}
-                                    >
-                                        <div className="mr-3 text-lg">
-                                            <i className={getDocTypeIcon(doc.type as DocType)}></i>
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{doc.title}</p>
-                                            <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
-                                                <span className="truncate">{doc.type}</span>
-                                                <span className="mx-1">•</span>
-                                                <span>{getRelativeTime(doc.updatedAt)}</span>
-                                            </div>
-                                        </div>
-
-                                        {confirmDelete === doc.id ? (
-                                            <div className="flex items-center space-x-1">
-                                                <button
-                                                    className="text-xs px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onDeleteDocument(doc.id!.toString());
-                                                        setConfirmDelete(null);
-                                                    }}
-                                                >
-                                                    Delete
-                                                </button>
-                                                <button
-                                                    className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-500"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setConfirmDelete(null);
-                                                    }}
-                                                >
-                                                    Cancel
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <button
-                                                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 dark:hover:text-red-400 focus:outline-none transition-opacity"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setConfirmDelete(doc.id!.toString());
-                                                }}
-                                            >
-                                                <i className="ri-delete-bin-line"></i>
-                                            </button>
-                                        )}
-                                    </div>
+                                    {renderDocumentItem(doc)}
                                 </motion.div>
                             ))}
                         </AnimatePresence>
@@ -344,12 +335,7 @@ const ExplorerPanel: React.FC<IDockviewPanelProps<ExplorerPanelProps>> = (props)
                                         </div>
                                         <button
                                             className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 dark:hover:text-red-400 p-1"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (window.confirm('Are you sure you want to delete this document?')) {
-                                                    onDeleteDocument(doc.id!.toString());
-                                                }
-                                            }}
+                                            onClick={(e) => handleDeleteClick(e, doc)}
                                         >
                                             <i className="ri-delete-bin-line"></i>
                                         </button>
@@ -358,7 +344,7 @@ const ExplorerPanel: React.FC<IDockviewPanelProps<ExplorerPanelProps>> = (props)
                                     <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 flex items-center">
                                         <span>{doc.type}</span>
                                         <span className="mx-1">•</span>
-                                        <span>{getRelativeTime(doc.updatedAt)}</span>
+                                        <span>{new Date(doc.updatedAt).toLocaleDateString()}</span>
                                     </div>
                                 </div>
                             </motion.div>
@@ -367,7 +353,7 @@ const ExplorerPanel: React.FC<IDockviewPanelProps<ExplorerPanelProps>> = (props)
                 )}
             </div>
         </div>
-    )
+    );
 };
 
 export default ExplorerPanel;

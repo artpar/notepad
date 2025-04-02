@@ -75,13 +75,13 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             >
                 <div className="flex items-start mb-4">
                     {icon && (<div
-                            className="flex-shrink-0 mr-4"
-                            style={{
-                                color: isDestructive ? '#e74c3c' : currentTheme.colors.accent
-                            }}
-                        >
-                            <i className={`${icon} text-2xl`}></i>
-                        </div>)}
+                        className="flex-shrink-0 mr-4"
+                        style={{
+                            color: isDestructive ? '#e74c3c' : currentTheme.colors.accent
+                        }}
+                    >
+                        <i className={`${icon} text-2xl`}></i>
+                    </div>)}
 
                     <div className="flex-1">
                         <h3

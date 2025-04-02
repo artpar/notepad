@@ -1,33 +1,49 @@
 // src/App.tsx
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import './App.css';
-import Sidebar from './components/Layout/Sidebar';
-import AppHeader from './components/Layout/AppHeader';
-import { useDocuments } from './contexts/DocumentContext';
-import { useSettings } from './contexts/SettingsContext';
+import {useDocuments} from './contexts/DocumentContext';
+import {useSettings} from './contexts/SettingsContext';
+import {Document} from './types/document';
 
-import { DockviewReact, DockviewReadyEvent, IDockviewApi, PanelCollection, SerializedDockview } from 'dockview';
+import {DockviewReact, DockviewReadyEvent, IDockviewApi, PanelCollection, SerializedDockview} from 'dockview';
 import 'dockview/dist/styles/dockview.css';
+import 'remixicon/fonts/remixicon.css';
+import {AnimatePresence, motion} from 'framer-motion';
 
 // Import components
+import AppHeader from './components/Layout/AppHeader';
+import Sidebar from './components/Layout/Sidebar';
 import DocumentEditorPanel from './components/Editor/DocumentEditorPanel';
 import DocumentPreviewPanel from './components/Preview/DocumentPreviewPanel';
 import ExplorerPanel from './components/Explorer/ExplorerPanel';
 import PropertiesPanel from './components/Properties/PropertiesPanel';
-import { CustomGroupPanel, CustomWatermarkPanel } from './components/Panels/CustomPanels';
+import {CustomGroupPanel, CustomWatermarkPanel} from './components/Panels/CustomPanels';
+import ConfirmationModal from './components/UI/ConfirmationModal';
+import ContextMenu, {ContextMenuItem} from './components/UI/ContextMenu';
 
-// Helper functions
-import { loadDocumentsFromStorage, loadLayoutFromStorage } from './utils/storage';
+// Import services and utils
+import {loadLayoutFromStorage} from './utils/storage';
 import * as StorageService from './services/storage';
-import 'remixicon/fonts/remixicon.css';
-import { getDocument } from "./services/storage";
-import { motion, AnimatePresence } from 'framer-motion';
+import ToastProvider, {useToast} from "./components/UI/ToastSystem.tsx";
+import DocumentSearch from "./components/Search/DocumentSearch.tsx";
+import Welcome from "./components/UI/Welcome.tsx";
 
-function App() {
-    // Use the document context instead of managing documents locally
+// App component wrapper with Toast provider
+const AppWithProviders = () => {
+    return (
+        <ToastProvider>
+            <AppContent/>
+        </ToastProvider>
+    );
+};
+
+// Main App content component
+function AppContent() {
+    const {showToast} = useToast();
+    // Use the document context
     const {
         documents,
-        activeDocument: activeDoc,
+        activeDocument,
         updateDocument,
         createDocument: createContextDocument,
         openDocument: openContextDocument,
@@ -35,23 +51,44 @@ function App() {
         closeDocument
     } = useDocuments();
 
-    const { currentTheme } = useSettings();
+    const {currentTheme} = useSettings();
     const [dockviewApi, setDockviewApi] = useState<IDockviewApi | null>(null);
     const [savedLayout, setSavedLayout] = useState<SerializedDockview | undefined>(loadLayoutFromStorage());
     const [showSidebar, setShowSidebar] = useState(true);
     const [isLoading, setIsLoading] = useState(true);
+    const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
+    const [contextMenu, setContextMenu] = useState<{
+        position: { x: number; y: number } | null;
+        document: Document | null
+    }>({
+        position: null,
+        document: null
+    });
 
-    // Save layout to localStorage whenever it changes
-    const saveLayout = useCallback(() => {
-        if (dockviewApi) {
-            try {
-                const layout = dockviewApi.toJSON();
-                localStorage.setItem('engineer-notepad-layout', JSON.stringify(layout));
-            } catch (e) {
-                console.error('Error saving layout to localStorage:', e);
-            }
-        }
-    }, [dockviewApi]);
+    // Add global search state
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+    // Add welcome screen state
+    const [showWelcome, setShowWelcome] = useState(false);
+
+    // Add command palette state
+    const [showCommandPalette, setShowCommandPalette] = useState(false);
+
+    // Save layout reference - keeping this outside the lifecycle
+    const saveLayoutRef = useRef<() => void>(() => {
+    });
+
+    // Define core functions first to avoid circular references
+
+    // Close context menu
+    const closeContextMenu = useCallback(() => {
+        setContextMenu({position: null, document: null});
+    }, []);
+
+    // Toggle sidebar visibility
+    const toggleSidebar = useCallback(() => {
+        setShowSidebar(prev => !prev);
+    }, []);
 
     // Create a new document - wrapper around context function
     const createDocument = useCallback((type: string, language?: string) => {
@@ -69,127 +106,20 @@ function App() {
                         },
                         title: newDoc.title
                     });
-                    saveLayout();
-                }
-            }
-        });
-    }, [createContextDocument, documents, dockviewApi, updateDocument, saveLayout]);
+                    saveLayoutRef.current();
 
-    // Update document title
-    const updateDocumentTitle = useCallback((title: string) => {
-        if (!activeDoc) return;
-
-        // Create updated document
-        const updatedDoc = {
-            ...activeDoc,
-            title,
-            updatedAt: new Date()
-        };
-
-        // Save document first to ensure data consistency
-        saveDocument(updatedDoc).then(() => {
-            // Update the document list to reflect title change
-            setDocuments(prevDocs =>
-                prevDocs.map(doc =>
-                    doc.id === activeDoc.id ? { ...doc, title, updatedAt: new Date() } : doc
-                )
-            );
-
-            // Update panel title if it exists
-            if (dockviewApi) {
-                // Update the editor panel
-                const editorPanel = dockviewApi.getPanel(`editor-${activeDoc.id}`);
-                if (editorPanel) {
-                    editorPanel.setTitle(title);
-                }
-
-                // Also update any preview panels that might exist
-                const previewPanel = dockviewApi.getPanel(`preview-${activeDoc.id}`);
-                if (previewPanel) {
-                    previewPanel.setTitle(`Preview: ${title}`);
-                }
-            }
-
-            // Save the updated layout
-            saveLayout();
-        });
-    }, [activeDoc, dockviewApi, saveDocument, saveLayout]);
-
-    // Delete a document
-    const deleteDocument = useCallback((id: number) => {
-        closeDocument(id);
-
-        // Delete the document from storage
-        StorageService.deleteDocument(id)
-            .then(() => {
-                console.log(`Document ${id} deleted successfully`);
-            })
-            .catch(error => {
-                console.error(`Error deleting document ${id}:`, error);
-            });
-
-        // Close related panels if they exist
-        saveLayout();
-        if (dockviewApi) {
-            try {
-                // Instead of trying to remove panels directly, let's get all groups and panels
-                const groups = dockviewApi.groups;
-
-                // Iterate through all groups to find and close panels by ID
-                groups.forEach(group => {
-                    const panels = group.panels;
-
-                    // Look for editor and preview panels for this document
-                    panels.forEach(panel => {
-                        if (panel.id === `editor-${id}` || panel.id === `preview-${id}`) {
-                            // Use the panel's close method which is safer
-                            panel.close();
-                        }
+                    // Show success toast
+                    showToast(`Created new ${type} document`, {
+                        type: 'success',
+                        duration: 2000
                     });
-                });
-            } catch (error) {
-                console.error(`Error removing panels for document ${id}:`, error);
+                }
             }
-        }
-    }, [closeDocument, dockviewApi, saveLayout]);
+        });
+    }, [createContextDocument, documents, dockviewApi, updateDocument, showToast]);
 
-    // Toggle sidebar visibility
-    const toggleSidebar = useCallback(() => {
-        setShowSidebar(prev => !prev);
-    }, []);
-
-    // Export the current document
-    const exportDocument = useCallback(() => {
-        if (!activeDoc) return;
-
-        const getFileExtension = (type: string): string => {
-            switch (type) {
-                case 'markdown':
-                    return 'md';
-                case 'javascript':
-                    return 'js';
-                case 'python':
-                    return 'py';
-                case 'html':
-                    return 'html';
-                default:
-                    return 'txt';
-            }
-        };
-
-        const blob = new Blob([activeDoc.content], {type: 'text/plain'});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${activeDoc.title}.${getFileExtension(activeDoc.type)}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }, [activeDoc]);
-
-    // Open document in editor - wrapper around context function
-    const openDocument = useCallback((doc: any) => {
+    // Open document in editor
+    const openDocument = useCallback((doc: Document) => {
         openContextDocument(doc.id!);
 
         // Check if document is already open in editor
@@ -212,26 +142,169 @@ function App() {
         }
     }, [dockviewApi, openContextDocument, updateDocument]);
 
+    // Delete document with confirmation
+    const deleteDocument = useCallback((id: number) => {
+        const doc = documents.find(d => d.id === id);
+        if (doc) {
+            setDocumentToDelete(doc);
+        }
+    }, [documents]);
+
+    // Handle delete confirmation
+    const handleConfirmDelete = useCallback(() => {
+        if (documentToDelete) {
+            const docTitle = documentToDelete.title;
+            closeDocument(documentToDelete.id!);
+
+            // Delete the document from storage
+            StorageService.deleteDocument(documentToDelete.id!)
+                .then(() => {
+                    console.log(`Document ${documentToDelete.id} deleted successfully`);
+                    showToast(`Deleted "${docTitle}"`, {
+                        type: 'success',
+                        action: {
+                            label: 'Undo',
+                            onClick: () => {
+                                // In a real app, you'd implement undo functionality here
+                                showToast('Undo functionality would be implemented here', {type: 'info'});
+                            }
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error(`Error deleting document ${documentToDelete.id}:`, error);
+                    showToast('Failed to delete document', {type: 'error'});
+                });
+
+            // Close related panels if they exist
+            saveLayoutRef.current();
+            if (dockviewApi) {
+                try {
+                    // Find and close panels for this document
+                    const groups = dockviewApi.groups;
+                    groups.forEach(group => {
+                        const panels = group.panels;
+                        panels.forEach(panel => {
+                            if (panel.id === `editor-${documentToDelete.id}` || panel.id === `preview-${documentToDelete.id}`) {
+                                panel.close();
+                            }
+                        });
+                    });
+                } catch (error) {
+                    console.error(`Error removing panels for document ${documentToDelete.id}:`, error);
+                }
+            }
+
+            // Close the confirmation modal
+            setDocumentToDelete(null);
+        }
+    }, [documentToDelete, closeDocument, dockviewApi, showToast]);
+
+    // Handle delete cancellation
+    const handleCancelDelete = useCallback(() => {
+        setDocumentToDelete(null);
+    }, []);
+
+    // Update document title
+    const updateDocumentTitle = useCallback((title: string) => {
+        if (!activeDocument) return;
+
+        // Create updated document
+        const updatedDoc = {
+            ...activeDocument,
+            title,
+            updatedAt: new Date()
+        };
+
+        // Save document to storage
+        saveDocument(updatedDoc).then(() => {
+            // Update panel titles if they exist
+            if (dockviewApi) {
+                // Update the editor panel
+                const editorPanel = dockviewApi.getPanel(`editor-${activeDocument.id}`);
+                if (editorPanel) {
+                    editorPanel.setTitle(title);
+                }
+
+                // Also update any preview panels that might exist
+                const previewPanel = dockviewApi.getPanel(`preview-${activeDocument.id}`);
+                if (previewPanel) {
+                    previewPanel.setTitle(`Preview: ${title}`);
+                }
+            }
+
+            // Save the updated layout
+            saveLayoutRef.current();
+        });
+    }, [activeDocument, dockviewApi, saveDocument]);
+
+    // Export the current document
+    const exportDocument = useCallback(() => {
+        if (!activeDocument) {
+            showToast('No document to export', {type: 'warning'});
+            return;
+        }
+
+        const getFileExtension = (type: string): string => {
+            switch (type) {
+                case 'markdown':
+                    return 'md';
+                case 'javascript':
+                    return 'js';
+                case 'python':
+                    return 'py';
+                case 'html':
+                    return 'html';
+                default:
+                    return 'txt';
+            }
+        };
+
+        try {
+            const blob = new Blob([activeDocument.content], {type: 'text/plain'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const fileName = `${activeDocument.title}.${getFileExtension(activeDocument.type)}`;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showToast(`Exported "${fileName}" successfully`, {type: 'success'});
+        } catch (error) {
+            console.error('Error exporting document:', error);
+            showToast('Failed to export document', {type: 'error'});
+        }
+    }, [activeDocument, showToast]);
+
     // Toggle preview for the current document
     const togglePreview = useCallback(() => {
-        if (!activeDoc || !dockviewApi) return;
+        if (!activeDocument) {
+            showToast('No document to preview', {type: 'warning'});
+            return;
+        }
 
-        const previewPanelId = `preview-${activeDoc.id}`;
-        const editorPanelId = `editor-${activeDoc.id}`;
+        if (!dockviewApi) return;
+
+        const previewPanelId = `preview-${activeDocument.id}`;
+        const editorPanelId = `editor-${activeDocument.id}`;
         const existingPanel = dockviewApi.getPanel(previewPanelId);
         const editorPanel = dockviewApi.getPanel(editorPanelId);
 
         if (existingPanel) {
             existingPanel.close();
+            showToast('Preview closed', {type: 'info', duration: 1500});
         } else {
             // Create panel config
             const panelConfig: any = {
                 id: previewPanelId,
                 component: 'documentPreview',
                 params: {
-                    document: activeDoc
+                    document: activeDocument
                 },
-                title: `Preview: ${activeDoc.title}`
+                title: `Preview: ${activeDocument.title}`
             };
 
             // Only add position if editor panel exists
@@ -243,8 +316,198 @@ function App() {
             }
 
             dockviewApi.addPanel(panelConfig);
+
+            if (activeDocument.type === 'markdown') {
+                showToast('Markdown preview opened', {
+                    type: 'info',
+                    duration: 2000,
+                    action: {
+                        label: 'Split View',
+                        onClick: () => {
+                            // This would ideally switch to a split view mode
+                            showToast('Split view would be implemented here', {type: 'info'});
+                        }
+                    }
+                });
+            } else {
+                showToast('Preview opened', {type: 'info', duration: 1500});
+            }
         }
-    }, [activeDoc, dockviewApi]);
+    }, [activeDocument, dockviewApi, showToast]);
+
+    // Context menu items
+    const getContextMenuItems = useCallback((): ContextMenuItem[] => {
+        if (!contextMenu.document) return [];
+
+        return [
+            {
+                id: 'open',
+                label: 'Open',
+                icon: 'ri-file-line',
+                action: () => openDocument(contextMenu.document!),
+                shortcut: '↵'
+            },
+            {
+                id: 'preview',
+                label: 'Preview',
+                icon: 'ri-eye-line',
+                action: () => {
+                    openDocument(contextMenu.document!);
+                    setTimeout(() => togglePreview(), 100);
+                },
+                shortcut: 'Ctrl+P'
+            },
+            {
+                id: 'rename',
+                label: 'Rename',
+                icon: 'ri-edit-line',
+                action: () => {
+                    openDocument(contextMenu.document!);
+                    // This will trigger the rename UI in PropertiesPanel
+                }
+            },
+            {
+                id: 'export',
+                label: 'Export',
+                icon: 'ri-download-line',
+                action: () => {
+                    openDocument(contextMenu.document!);
+                    exportDocument();
+                },
+                shortcut: 'Ctrl+E'
+            },
+            {
+                id: 'duplicate',
+                label: 'Duplicate',
+                icon: 'ri-file-copy-line',
+                action: () => {
+                    // Implement duplicate functionality
+                    const docToDuplicate = contextMenu.document!;
+                    const newDoc = {
+                        ...docToDuplicate,
+                        id: undefined,
+                        title: `${docToDuplicate.title} (Copy)`,
+                        createdAt: new Date(),
+                        updatedAt: new Date()
+                    };
+                    createDocument(newDoc.type, newDoc.language);
+                }
+            },
+            {
+                id: 'delete',
+                label: 'Delete',
+                icon: 'ri-delete-bin-line',
+                action: () => setDocumentToDelete(contextMenu.document),
+                isDestructive: true,
+                divider: true
+            }
+        ];
+    }, [contextMenu.document, openDocument, togglePreview, exportDocument, createDocument]);
+
+    // Initialize default layout
+    const initializeDefaultLayout = useCallback((api: IDockviewApi) => {
+        // Add explorer panel by default
+        api.addPanel({
+            id: 'explorer',
+            component: 'explorer',
+            params: {
+                documents,
+                onSelectDocument: openDocument,
+                onCreateDocument: createDocument,
+                onDeleteDocument: deleteDocument
+            },
+            title: 'Explorer'
+        });
+
+        // If we have an active document, open it
+        if (activeDocument) {
+            api.addPanel({
+                id: `editor-${activeDocument.id}`,
+                component: 'documentEditor',
+                params: {
+                    document: activeDocument,
+                    onUpdate: (content: string) => {
+                        updateDocument(activeDocument.id!, content);
+                    }
+                },
+                title: activeDocument.title
+            });
+        }
+    }, [activeDocument, documents, openDocument, createDocument, deleteDocument, updateDocument]);
+
+    // Handle dockview ready event
+    const handleDockviewReady = useCallback(async (event: DockviewReadyEvent) => {
+        setDockviewApi(event.api);
+
+        // If we have a saved layout, restore it
+        if (savedLayout) {
+            try {
+                const panelKeys = Object.keys(savedLayout.panels);
+                for (const panelKey of panelKeys) {
+                    const panelObject = savedLayout.panels[panelKey];
+                    if (!panelObject.params) {
+                        panelObject.params = {};
+                    }
+
+                    // Create a reference to the document ID instead of the document itself
+                    const docId = panelObject.params.document?.id;
+                    if (docId) {
+                        // Use the updateDocument function directly without capturing it in a closure
+                        const doc = await StorageService.getDocument(docId);
+                        panelObject.params.document = doc;
+                        panelObject.params["onUpdate"] = ((panelObject) => {
+                            return (content: string) => {
+                                updateDocument(panelObject.params.document.id, content);
+                            }
+                        })(panelObject);
+                    }
+                }
+                event.api.fromJSON(savedLayout);
+            } catch (e) {
+                console.error('Error restoring layout:', e);
+                initializeDefaultLayout(event.api);
+            }
+        } else {
+            initializeDefaultLayout(event.api);
+        }
+
+        // Save layout when panels are moved or resized
+        event.api.onDidLayoutChange(() => {
+            saveLayoutRef.current();
+        });
+
+        // Set loading to false once everything is initialized
+        setIsLoading(false);
+    }, [savedLayout, updateDocument, initializeDefaultLayout]);
+
+    // Components for the dockview
+    const components = useMemo<PanelCollection>(() => ({
+        documentEditor: DocumentEditorPanel,
+        documentPreview: DocumentPreviewPanel,
+        explorer: ExplorerPanel,
+        properties: PropertiesPanel
+    }), []);
+
+    // Setup save layout function reference
+    useEffect(() => {
+        if (dockviewApi) {
+            saveLayoutRef.current = () => {
+                try {
+                    const layout = dockviewApi.toJSON();
+                    localStorage.setItem('engineer-notepad-layout', JSON.stringify(layout));
+
+                    // Show success toast when layout is explicitly saved (not auto-saved)
+                    showToast('Layout saved successfully', {
+                        type: 'success',
+                        duration: 2000
+                    });
+                } catch (e) {
+                    console.error('Error saving layout to localStorage:', e);
+                    showToast('Failed to save layout', {type: 'error'});
+                }
+            };
+        }
+    }, [dockviewApi, showToast]);
 
     // Handle keyboard shortcuts
     useEffect(() => {
@@ -258,7 +521,7 @@ function App() {
             // Ctrl/Cmd + S: Save layout
             if ((e.ctrlKey || e.metaKey) && e.key === 's') {
                 e.preventDefault();
-                saveLayout();
+                saveLayoutRef.current();
             }
 
             // Ctrl/Cmd + P: Toggle preview
@@ -284,95 +547,29 @@ function App() {
                 e.preventDefault();
                 toggleSidebar();
             }
+
+            // Ctrl/Cmd + F: Global search
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                setIsSearchOpen(true);
+            }
+
+            // Alt + Space or Ctrl + Space: Quick search
+            if (((e.altKey || e.ctrlKey) && e.key === ' ') || e.key === 'F1') {
+                e.preventDefault();
+                setIsSearchOpen(true);
+            }
+
+            // Ctrl+K or Cmd+K: Command palette
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                setShowCommandPalette(true);
+            }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [activeDoc, dockviewApi, saveLayout, togglePreview, createDocument, exportDocument, toggleSidebar]);
-
-    // Components for the dockview
-    const components = useMemo<PanelCollection>(() => ({
-        documentEditor: DocumentEditorPanel,
-        documentPreview: DocumentPreviewPanel,
-        explorer: ExplorerPanel,
-        properties: PropertiesPanel
-    }), []);
-
-    // Handle dockview ready event
-    const handleDockviewReady = useCallback(async (event: DockviewReadyEvent) => {
-        setDockviewApi(event.api);
-
-        // If we have a saved layout, restore it
-        if (savedLayout) {
-            try {
-                const panelKeys = Object.keys(savedLayout.panels);
-                for (const panelKey of panelKeys) {
-                    const panelObject = savedLayout.panels[panelKey];
-                    if (!panelObject.params){
-                        panelObject.params = {};
-                    }
-
-                    // Create a reference to the document ID instead of the document itself
-                    const docId = panelObject.params.document?.id;
-                    if (docId) {
-                        // Use the updateDocument function directly without capturing it in a closure
-                        const doc = await getDocument(docId);
-                        panelObject.params.document = doc;
-                        panelObject.params["onUpdate"] = ((panelObject) => {
-                            return (content: string) => {
-                                updateDocument(panelObject.params.document.id, content);
-                            }
-                        })(panelObject);
-                    }
-                }
-                event.api.fromJSON(savedLayout);
-            } catch (e) {
-                console.error('Error restoring layout:', e);
-                initializeDefaultLayout(event.api);
-            }
-        } else {
-            initializeDefaultLayout(event.api);
-        }
-
-        // Save layout when panels are moved or resized
-        event.api.onDidLayoutChange(() => {
-            saveLayout();
-        });
-
-        // Set loading to false once everything is initialized
-        setIsLoading(false);
-    }, [savedLayout, updateDocument]);
-
-    // Initialize default layout
-    const initializeDefaultLayout = useCallback((api: IDockviewApi) => {
-        // Add explorer panel by default
-        api.addPanel({
-            id: 'explorer',
-            component: 'explorer',
-            params: {
-                documents,
-                onSelectDocument: openDocument,
-                onCreateDocument: createDocument,
-                onDeleteDocument: deleteDocument
-            },
-            title: 'Explorer'
-        });
-
-        // If we have an active document, open it
-        if (activeDoc) {
-            api.addPanel({
-                id: `editor-${activeDoc.id}`,
-                component: 'documentEditor',
-                params: {
-                    document: activeDoc,
-                    onUpdate: (content: string) => {
-                        updateDocument(activeDoc.id!, content);
-                    }
-                },
-                title: activeDoc.title
-            });
-        }
-    }, [activeDoc, documents, openDocument, createDocument, deleteDocument, updateDocument]);
+    }, [togglePreview, createDocument, exportDocument, toggleSidebar]);
 
     // Apply theme to body
     useEffect(() => {
@@ -383,6 +580,16 @@ function App() {
         }
     }, [currentTheme.isDark]);
 
+    // Check if this is the first run and show welcome
+    useEffect(() => {
+        const hasSeenWelcome = localStorage.getItem('engineers-notepad-welcome-seen');
+        if (!hasSeenWelcome && !isLoading) {
+            setShowWelcome(true);
+            // Mark welcome as seen for future visits
+            localStorage.setItem('engineers-notepad-welcome-seen', 'true');
+        }
+    }, [isLoading]);
+
     // Render the UI
     return (
         <div
@@ -392,19 +599,55 @@ function App() {
                 color: currentTheme.colors.foreground
             }}
         >
+            {/* Confirmation Modal for deletion */}
+            <ConfirmationModal
+                isOpen={documentToDelete !== null}
+                title="Delete Document"
+                message={`Are you sure you want to delete "${documentToDelete?.title}"? This action cannot be undone.`}
+                confirmLabel="Delete"
+                cancelLabel="Cancel"
+                isDestructive={true}
+                icon="ri-delete-bin-line"
+                onConfirm={handleConfirmDelete}
+                onCancel={handleCancelDelete}
+            />
+
+            {/* Context Menu for document actions */}
+            <ContextMenu
+                items={getContextMenuItems()}
+                position={contextMenu.position}
+                onClose={closeContextMenu}
+            />
+
+            {/* Global Document Search */}
+            <DocumentSearch
+                documents={documents}
+                onSelectDocument={openDocument}
+                onClose={() => setIsSearchOpen(false)}
+                isOpen={isSearchOpen}
+            />
+
+            {/* Welcome screen for first-time users */}
+            <Welcome
+                isOpen={showWelcome}
+                onClose={() => setShowWelcome(false)}
+                onCreateDocument={createDocument}
+            />
+
             {/* Loading overlay */}
             <AnimatePresence>
                 {isLoading && (
                     <motion.div
-                        initial={{ opacity: 1 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.5 }}
+                        initial={{opacity: 1}}
+                        animate={{opacity: 1}}
+                        exit={{opacity: 0}}
+                        transition={{duration: 0.5}}
                         className="fixed inset-0 z-50 flex items-center justify-center"
-                        style={{ backgroundColor: currentTheme.colors.background }}
+                        style={{backgroundColor: currentTheme.colors.background}}
                     >
                         <div className="text-center">
-                            <i className="ri-quill-pen-line text-6xl mb-4" style={{ color: currentTheme.colors.accent }}></i>
+                            <i className="ri-quill-pen-line text-6xl mb-4"
+                               style={{color: currentTheme.colors.accent}}></i>
                             <h1 className="text-2xl font-bold mb-2">Engineer's Notepad</h1>
                             <p className="text-lg opacity-70">Loading your workspace...</p>
                         </div>
@@ -414,10 +657,12 @@ function App() {
 
             {/* App header */}
             <AppHeader
-                onSaveLayout={saveLayout}
+                onSaveLayout={saveLayoutRef.current}
                 onTogglePreview={togglePreview}
                 onExportDocument={exportDocument}
                 onToggleSidebar={toggleSidebar}
+                onOpenSearch={() => setIsSearchOpen(true)}
+                onOpenCommandPalette={() => setShowCommandPalette(true)}
                 showSidebar={showSidebar}
             />
 
@@ -426,7 +671,7 @@ function App() {
                 {showSidebar && (
                     <Sidebar
                         documents={documents}
-                        activeDoc={activeDoc}
+                        activeDoc={activeDocument}
                         onSelectDocument={openDocument}
                         onCreateDocument={createDocument}
                         onDeleteDocument={deleteDocument}
@@ -453,16 +698,16 @@ function App() {
                     }}
             >
                 <div className="flex space-x-4">
-                    {activeDoc && (
+                    {activeDocument && (
                         <>
                             <span className="flex items-center">
                                 <i className="ri-file-type-line mr-1"></i>
-                                {activeDoc.type.toUpperCase()}
-                                {activeDoc.language && ` - ${activeDoc.language}`}
+                                {activeDocument.type.toUpperCase()}
+                                {activeDocument.language && ` - ${activeDocument.language}`}
                             </span>
                             <span className="flex items-center">
                                 <i className="ri-time-line mr-1"></i>
-                                Last modified: {new Date(activeDoc.updatedAt).toLocaleString()}
+                                Last modified: {new Date(activeDocument.updatedAt).toLocaleString()}
                             </span>
                         </>
                     )}
@@ -478,4 +723,4 @@ function App() {
     );
 }
 
-export default App;
+export default AppWithProviders;

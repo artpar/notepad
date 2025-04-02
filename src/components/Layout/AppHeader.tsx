@@ -1,7 +1,7 @@
 // src/components/Layout/AppHeader.tsx
-import React, { useState } from 'react';
-import { useSettings } from '../../contexts/SettingsContext';
-import { useDocuments } from '../../contexts/DocumentContext';
+import React, {useState} from 'react';
+import {useSettings} from '../../contexts/SettingsContext';
+import {useDocuments} from '../../contexts/DocumentContext';
 import 'remixicon/fonts/remixicon.css';
 
 interface AppHeaderProps {
@@ -9,6 +9,7 @@ interface AppHeaderProps {
     onTogglePreview: () => void;
     onExportDocument: () => void;
     onToggleSidebar: () => void;
+    onOpenSearch: () => void;
     showSidebar: boolean;
 }
 
@@ -17,10 +18,11 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                                                  onTogglePreview,
                                                  onExportDocument,
                                                  onToggleSidebar,
+                                                 onOpenSearch,
                                                  showSidebar
                                              }) => {
-    const { currentTheme, toggleTheme } = useSettings();
-    const { activeDocument, createDocument } = useDocuments();
+    const {currentTheme, toggleTheme} = useSettings();
+    const {activeDocument, createDocument} = useDocuments();
     const [showCreateMenu, setShowCreateMenu] = useState(false);
     const [showHelpMenu, setShowHelpMenu] = useState(false);
 
@@ -41,44 +43,51 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             {/* Logo and sidebar toggle */}
             <div className="flex items-center">
                 <button
-                    className="p-2 rounded-md mr-2 transition-colors"
+                    className="p-2 rounded-md mr-2 transition-colors hover:bg-opacity-10 hover:bg-gray-500"
                     style={{
-                        color: currentTheme.colors.buttonText,
-                        hover: { backgroundColor: currentTheme.colors.buttonHover }
+                        color: currentTheme.colors.buttonText
                     }}
                     onClick={onToggleSidebar}
-                    title={showSidebar ? "Hide Sidebar" : "Show Sidebar"}
+                    title={showSidebar ? "Hide Sidebar (Ctrl+B)" : "Show Sidebar (Ctrl+B)"}
                 >
                     <i className={`ri-${showSidebar ? 'menu-fold-line' : 'menu-unfold-line'} text-lg`}></i>
                 </button>
-
-                <div className="flex items-center">
-                    <i className="ri-quill-pen-line text-xl mr-2" style={{color: currentTheme.colors.accent}}></i>
-                    <h4 className="text-lg font-bold" style={{color: currentTheme.colors.headerText}}>Engineer's Notepad</h4>
-                </div>
             </div>
 
             {/* Center section - document title when available */}
-            <div className="flex-1 mx-6 text-center">
+            <div className="flex-1 mx-6 text-center hidden md:block">
                 {activeDocument && (
                     <div className="flex items-center justify-center">
                         <i className={`ri-${activeDocument.type === 'markdown' ? 'markdown-line' :
-                            activeDocument.type === 'code' ||
-                            activeDocument.type === 'javascript' ||
-                            activeDocument.type === 'python' ||
-                            activeDocument.type === 'html' ? 'code-line' :
-                                'file-text-line'} mr-2`} style={{color: currentTheme.colors.headerText}}></i>
-                        <span className="font-medium" style={{color: currentTheme.colors.headerText}}>{activeDocument.title}</span>
+                            activeDocument.type === 'javascript' ? 'javascript-line' :
+                                activeDocument.type === 'python' ? 'code-line' :
+                                    activeDocument.type === 'html' ? 'html5-line' :
+                                        'file-text-line'} mr-2`} style={{color: currentTheme.colors.headerText}}></i>
+                        <span className="font-medium"
+                              style={{color: currentTheme.colors.headerText}}>{activeDocument.title}</span>
                     </div>
                 )}
             </div>
 
             {/* Controls */}
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1 md:space-x-2">
+                {/* Search button */}
+                <button
+                    className="p-2 rounded-md transition-colors hover:bg-opacity-10 hover:bg-gray-500 flex items-center"
+                    style={{
+                        color: currentTheme.colors.buttonText
+                    }}
+                    onClick={onOpenSearch}
+                    title={`Search Documents (${getShortcutKey('F')})`}
+                >
+                    <i className="ri-search-line text-lg mr-1"></i>
+                    <span className="hidden sm:inline">Search</span>
+                </button>
+
                 {/* New document button */}
                 <div className="relative">
                     <button
-                        className="p-2 rounded-md transition-colors flex items-center"
+                        className="p-2 rounded-md transition-colors hover:bg-opacity-10 hover:bg-gray-500 flex items-center"
                         style={{
                             color: currentTheme.colors.buttonText,
                             backgroundColor: showCreateMenu ? currentTheme.colors.buttonActiveBackground : 'transparent'
@@ -99,32 +108,46 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                                 color: currentTheme.colors.foreground
                             }}
                         >
-                            <div className="p-2 border-b" style={{ borderColor: currentTheme.colors.border }}>
+                            <div className="p-2 border-b" style={{borderColor: currentTheme.colors.border}}>
                                 <h3 className="font-medium">Create New Document</h3>
                             </div>
 
                             <div className="py-1">
                                 {[
-                                    { type: 'text', label: 'Plain Text', icon: 'ri-file-text-line', description: 'Simple text document' },
-                                    { type: 'markdown', label: 'Markdown', icon: 'ri-markdown-line', description: 'Format with Markdown syntax' },
-                                    { type: 'javascript', label: 'JavaScript', icon: 'ri-javascript-line', description: 'JavaScript code' },
-                                    { type: 'python', label: 'Python', icon: 'ri-code-line', description: 'Python code' },
-                                    { type: 'html', label: 'HTML', icon: 'ri-html5-line', description: 'HTML document' }
+                                    {
+                                        type: 'text',
+                                        label: 'Plain Text',
+                                        icon: 'ri-file-text-line',
+                                        description: 'Simple text document'
+                                    },
+                                    {
+                                        type: 'markdown',
+                                        label: 'Markdown',
+                                        icon: 'ri-markdown-line',
+                                        description: 'Format with Markdown syntax'
+                                    },
+                                    {
+                                        type: 'javascript',
+                                        label: 'JavaScript',
+                                        icon: 'ri-javascript-line',
+                                        description: 'JavaScript code'
+                                    },
+                                    {type: 'python', label: 'Python', icon: 'ri-code-line', description: 'Python code'},
+                                    {type: 'html', label: 'HTML', icon: 'ri-html5-line', description: 'HTML document'}
                                 ].map(item => (
                                     <button
                                         key={item.type}
-                                        className="w-full text-left px-4 py-2 transition-colors flex items-start gap-3"
+                                        className="w-full text-left px-4 py-2 transition-colors hover:bg-opacity-10 hover:bg-gray-500 flex items-start gap-3"
                                         style={{
-                                            backgroundColor: currentTheme.colors.background,
-                                            color: currentTheme.colors.foreground,
-                                            hover: { backgroundColor: currentTheme.colors.buttonHover }
+                                            color: currentTheme.colors.foreground
                                         }}
                                         onClick={() => {
                                             createDocument(item.type as any);
                                             setShowCreateMenu(false);
                                         }}
                                     >
-                                        <i className={`${item.icon} text-xl mt-0.5`} style={{color: currentTheme.colors.accent}}></i>
+                                        <i className={`${item.icon} text-xl mt-0.5`}
+                                           style={{color: currentTheme.colors.accent}}></i>
                                         <div>
                                             <div className="font-medium">{item.label}</div>
                                             <div className="text-xs opacity-60">{item.description}</div>
@@ -141,10 +164,9 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                     <>
                         {/* Preview toggle */}
                         <button
-                            className="p-2 rounded-md transition-colors flex items-center"
+                            className="p-2 rounded-md transition-colors hover:bg-opacity-10 hover:bg-gray-500 flex items-center"
                             style={{
-                                color: currentTheme.colors.buttonText,
-                                hover: { backgroundColor: currentTheme.colors.buttonHover }
+                                color: currentTheme.colors.buttonText
                             }}
                             onClick={onTogglePreview}
                             title={`Toggle Preview (${getShortcutKey('P')})`}
@@ -155,10 +177,9 @@ const AppHeader: React.FC<AppHeaderProps> = ({
 
                         {/* Export */}
                         <button
-                            className="p-2 rounded-md transition-colors flex items-center"
+                            className="p-2 rounded-md transition-colors hover:bg-opacity-10 hover:bg-gray-500 flex items-center"
                             style={{
-                                color: currentTheme.colors.buttonText,
-                                hover: { backgroundColor: currentTheme.colors.buttonHover }
+                                color: currentTheme.colors.buttonText
                             }}
                             onClick={onExportDocument}
                             title={`Export Document (${getShortcutKey('E')})`}
@@ -171,24 +192,22 @@ const AppHeader: React.FC<AppHeaderProps> = ({
 
                 {/* Save layout */}
                 <button
-                    className="p-2 rounded-md transition-colors flex items-center"
+                    className="p-2 rounded-md transition-colors hover:bg-opacity-10 hover:bg-gray-500 flex items-center"
                     style={{
-                        color: currentTheme.colors.buttonText,
-                        hover: { backgroundColor: currentTheme.colors.buttonHover }
+                        color: currentTheme.colors.buttonText
                     }}
                     onClick={onSaveLayout}
                     title={`Save Layout (${getShortcutKey('S')})`}
                 >
                     <i className="ri-save-line text-lg mr-1"></i>
-                    <span className="hidden sm:inline">Save Layout</span>
+                    <span className="hidden sm:inline">Save</span>
                 </button>
 
                 {/* Theme toggle */}
                 <button
-                    className="p-2 rounded-md transition-colors"
+                    className="p-2 rounded-md transition-colors hover:bg-opacity-10 hover:bg-gray-500"
                     style={{
-                        color: currentTheme.colors.buttonText,
-                        hover: { backgroundColor: currentTheme.colors.buttonHover }
+                        color: currentTheme.colors.buttonText
                     }}
                     onClick={toggleTheme}
                     title="Toggle Light/Dark Theme"
@@ -199,7 +218,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                 {/* Help menu */}
                 <div className="relative">
                     <button
-                        className="p-2 rounded-md transition-colors"
+                        className="p-2 rounded-md transition-colors hover:bg-opacity-10 hover:bg-gray-500"
                         style={{
                             color: currentTheme.colors.buttonText,
                             backgroundColor: showHelpMenu ? currentTheme.colors.buttonActiveBackground : 'transparent'
@@ -219,7 +238,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                                 color: currentTheme.colors.foreground
                             }}
                         >
-                            <div className="p-3 border-b" style={{ borderColor: currentTheme.colors.border }}>
+                            <div className="p-3 border-b" style={{borderColor: currentTheme.colors.border}}>
                                 <h3 className="font-medium">Keyboard Shortcuts</h3>
                             </div>
 
@@ -279,7 +298,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                                                 </span>
                                             </li>
                                             <li className="flex justify-between">
-                                                <span>Find in Document</span>
+                                                <span>Find in Documents</span>
                                                 <span className="font-mono px-1 rounded"
                                                       style={{
                                                           backgroundColor: currentTheme.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'
@@ -291,9 +310,10 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                                     </div>
                                 </div>
 
-                                <div className="mt-4 pt-3 border-t text-center" style={{ borderColor: currentTheme.colors.border }}>
+                                <div className="mt-4 pt-3 border-t text-center"
+                                     style={{borderColor: currentTheme.colors.border}}>
                                     <p className="text-xs opacity-70">
-                                        Engineer's Notepad v1.1.0 — A code-focused note-taking app
+                                        Engineer's Notepad v1.2.0 — A code-focused note-taking app
                                     </p>
                                 </div>
                             </div>
