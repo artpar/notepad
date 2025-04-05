@@ -59,14 +59,21 @@ export const initializeSettings = async (): Promise<Settings> => {
 
 // Document operations
 export const saveDocument = async (document: Document): Promise<number> => {
-  document.updatedAt = new Date();
+  // Create a safe copy of the document to prevent serialization issues
+  const safeDocument = {
+    ...document,
+    // Ensure content is always a string
+    content: document.content || '',
+    // Ensure dates are properly serialized
+    createdAt: document.createdAt instanceof Date ? document.createdAt : new Date(document.createdAt || Date.now()),
+    updatedAt: new Date()
+  };
 
   if (document.id) {
-    await db.documents.update(document.id, document);
+    await db.documents.update(document.id, safeDocument);
     return parseInt(document.id, 10);
   } else {
-    document.createdAt = new Date();
-    return await db.documents.add(document);
+    return await db.documents.add(safeDocument);
   }
 };
 
