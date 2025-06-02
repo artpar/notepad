@@ -10,6 +10,8 @@ import ContextMenu from '../UI/ContextMenu';
 import { IconButton, MenuButton } from '../UI/Buttons';
 import DocumentTypeMenu from '../UI/DocumentTypeMenu';
 import TagSelector from '../UI/TagSelector';
+import HelpMenu from '../UI/HelpMenu';
+import useKeyboardShortcuts from '../../hooks/useKeyboardShortcuts';
 import 'remixicon/fonts/remixicon.css';
 import {useDocuments} from "../../contexts/UseDocuments.tsx";
 import {DocumentType} from "../../types/DocumentType.tsx";
@@ -26,7 +28,7 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ onToggleSidebar, onSelectDocument }) => {
-  const { currentTheme } = useSettings();
+  const { currentTheme, toggleTheme } = useSettings();
   const {
     documents,
     activeDocument,
@@ -38,6 +40,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleSidebar, onSelectDocument }) 
     searchDocuments
   } = useDocuments();
   const { getDocumentIcon } = useDocumentActions();
+  const { getShortcutKey } = useKeyboardShortcuts();
 
   // State
   const [activeTab, setActiveTab] = useState<SidebarTab>(SidebarTab.Files);
@@ -53,6 +56,9 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleSidebar, onSelectDocument }) 
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [filterTag, setFilterTag] = useState<string | null>(null);
   const [sortOption, setSortOption] = useState<'name' | 'date' | 'type'>('date');
+  const [showHelpMenu, setShowHelpMenu] = useState(false);
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const [showSortMenu, setShowSortMenu] = useState(false);
 
   // Refs
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -357,32 +363,99 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleSidebar, onSelectDocument }) 
           />
         </div>
 
-        {/* Tag filters */}
-        <div className="p-2 border-b overflow-x-auto" style={{ borderColor: currentTheme.colors.border }}>
-          <TagSelector
-            tags={tags}
-            selectedTag={filterTag}
-            onSelectTag={(tag) => setFilterTag(tag === filterTag ? null : tag)}
-          />
-        </div>
+        {/* Filters and Sort */}
+        <div className="p-2 border-b space-y-2" style={{ borderColor: currentTheme.colors.border }}>
+          {/* Filter and Sort controls in one row */}
+          <div className="flex items-center justify-between gap-2">
+            {/* Filter dropdown */}
+            <MenuButton
+              icon={filterTag ? "filter-2-fill" : "filter-2-line"}
+              onClick={() => setShowFilterMenu(!showFilterMenu)}
+              title="Filter documents"
+              isOpen={showFilterMenu}
+              dropdownAlign="left"
+            >
+              <div className="p-2">
+                <div className="text-xs font-medium mb-2 opacity-70">Filter by type/tag</div>
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  <button
+                    className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-opacity-10 hover:bg-gray-500 ${!filterTag ? 'font-medium' : ''}`}
+                    style={{
+                      backgroundColor: !filterTag ? currentTheme.colors.buttonActiveBackground : 'transparent',
+                    }}
+                    onClick={() => {
+                      setFilterTag(null);
+                      setShowFilterMenu(false);
+                    }}
+                  >
+                    All documents
+                  </button>
+                  {tags.map(tag => (
+                    <button
+                      key={tag}
+                      className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-opacity-10 hover:bg-gray-500 ${filterTag === tag ? 'font-medium' : ''}`}
+                      style={{
+                        backgroundColor: filterTag === tag ? currentTheme.colors.buttonActiveBackground : 'transparent',
+                      }}
+                      onClick={() => {
+                        setFilterTag(tag);
+                        setShowFilterMenu(false);
+                      }}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </MenuButton>
 
-        {/* Sort options */}
-        <div className="p-2 border-b flex justify-between items-center" style={{ borderColor: currentTheme.colors.border }}>
-          <span className="text-xs opacity-70">Sort by:</span>
-          <div className="flex space-x-1">
-            {(['date', 'name', 'type'] as const).map(option => (
-              <button
-                key={option}
-                className={`px-2 py-1 text-xs rounded ${sortOption === option ? 'font-medium' : 'opacity-70'}`}
-                style={{
-                  backgroundColor: sortOption === option ? currentTheme.colors.buttonActiveBackground : 'transparent',
-                }}
-                onClick={() => setSortOption(option)}
-              >
-                {option.charAt(0).toUpperCase() + option.slice(1)}
-              </button>
-            ))}
+            {/* Sort dropdown */}
+            <MenuButton
+              icon="sort-desc"
+              onClick={() => setShowSortMenu(!showSortMenu)}
+              title="Sort documents"
+              isOpen={showSortMenu}
+              dropdownAlign="right"
+            >
+              <div className="p-2">
+                <div className="text-xs font-medium mb-2 opacity-70">Sort by</div>
+                <div className="space-y-1">
+                  {(['date', 'name', 'type'] as const).map(option => (
+                    <button
+                      key={option}
+                      className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-opacity-10 hover:bg-gray-500 ${sortOption === option ? 'font-medium' : ''}`}
+                      style={{
+                        backgroundColor: sortOption === option ? currentTheme.colors.buttonActiveBackground : 'transparent',
+                      }}
+                      onClick={() => {
+                        setSortOption(option);
+                        setShowSortMenu(false);
+                      }}
+                    >
+                      <i className={`ri-${option === 'date' ? 'time' : option === 'name' ? 'file-text' : 'folder-2'}-line mr-2`}></i>
+                      {option === 'date' ? 'Last modified' : option === 'name' ? 'Name' : 'Type'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </MenuButton>
           </div>
+
+          {/* Active filter indicator */}
+          {filterTag && (
+            <div className="flex items-center text-xs">
+              <span className="opacity-70">Filtered by:</span>
+              <span className="ml-1 px-2 py-0.5 rounded" style={{ backgroundColor: currentTheme.colors.buttonActiveBackground }}>
+                {filterTag}
+              </span>
+              <button
+                className="ml-2 opacity-70 hover:opacity-100"
+                onClick={() => setFilterTag(null)}
+              >
+                <i className="ri-close-line"></i>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Document list */}
@@ -418,6 +491,32 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleSidebar, onSelectDocument }) 
               ))}
             </div>
           )}
+        </div>
+
+        {/* Sidebar footer with theme toggle and help */}
+        <div className="border-t p-2 flex items-center justify-between" style={{ borderColor: currentTheme.colors.border }}>
+          <div className="flex items-center space-x-1">
+            {/* Theme toggle */}
+            <IconButton
+              icon={currentTheme.isDark ? 'sun-line' : 'moon-line'}
+              onClick={toggleTheme}
+              title="Toggle Light/Dark Theme"
+            />
+            
+            {/* Help menu */}
+            <MenuButton
+              icon="question-line"
+              isOpen={showHelpMenu}
+              onClick={() => setShowHelpMenu(!showHelpMenu)}
+              title="Help & Keyboard Shortcuts"
+            >
+              <HelpMenu getShortcutKey={getShortcutKey} />
+            </MenuButton>
+          </div>
+          
+          <div className="text-xs opacity-50">
+            {documents.length} documents
+          </div>
         </div>
 
         {/* Resize handle */}

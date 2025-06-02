@@ -17,7 +17,7 @@ const DocumentPreviewPanel: React.FC<IDockviewPanelProps<DocumentPreviewPanelPro
   const { params } = props;
   const { document } = params;
   const { currentTheme, settings } = useSettings();
-  const [stats, setStats] = useState(calculateDocumentStats(document.content));
+  const [stats, setStats] = useState(document ? calculateDocumentStats(document.content) : { wordCount: 0, charCount: 0, readingTimeMinutes: 0 });
 
   // Configure marked with syntax highlighting
   useEffect(() => {
@@ -29,11 +29,21 @@ const DocumentPreviewPanel: React.FC<IDockviewPanelProps<DocumentPreviewPanelPro
 
   // Update stats when document changes
   useEffect(() => {
-    setStats(calculateDocumentStats(document.content));
-  }, [document.content]);
+    if (document) {
+      setStats(calculateDocumentStats(document.content));
+    }
+  }, [document?.content]);
 
   // Simple preview rendering based on document type
   const renderPreview = () => {
+    if (!document) {
+      return (
+        <div className="preview text-preview p-6 text-center opacity-50">
+          No document to preview
+        </div>
+      );
+    }
+    
     switch (document.type.type) {
       case 'markdown':
         return (
@@ -93,11 +103,16 @@ const DocumentPreviewPanel: React.FC<IDockviewPanelProps<DocumentPreviewPanelPro
             style={{ borderColor: currentTheme.colors.border }}
         >
           <div className="flex items-center">
-            <i
-                className={`${getDocumentTypeIcon(document.type, document.language)} mr-2`}
-                style={{ color: currentTheme.colors.accent }}
-            ></i>
-            <h3 className="font-medium">Preview: {document.title}</h3>
+            {document && (
+              <>
+                <i
+                    className={`${getDocumentTypeIcon(document.type, document.language)} mr-2`}
+                    style={{ color: currentTheme.colors.accent }}
+                ></i>
+                <h3 className="font-medium">Preview: {document.title}</h3>
+              </>
+            )}
+            {!document && <h3 className="font-medium">Preview</h3>}
           </div>
 
           {settings.editor.showStatistics && (

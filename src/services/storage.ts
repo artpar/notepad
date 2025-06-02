@@ -69,11 +69,16 @@ export const saveDocument = async (document: Document): Promise<number> => {
     updatedAt: new Date()
   };
 
-  if (document.id) {
-    await db.documents.update(document.id, safeDocument);
+  // Check if document has a valid ID (not undefined, not empty string)
+  if (document.id && document.id !== "") {
+    // Don't include the id field when adding new document
+    const { id, ...documentWithoutId } = safeDocument;
+    await db.documents.update(parseInt(document.id, 10), documentWithoutId);
     return parseInt(document.id, 10);
   } else {
-    return await db.documents.add(safeDocument);
+    // Remove id field for new documents to let Dexie auto-generate it
+    const { id, ...documentWithoutId } = safeDocument;
+    return await db.documents.add(documentWithoutId);
   }
 };
 

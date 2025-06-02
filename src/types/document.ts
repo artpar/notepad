@@ -29,7 +29,7 @@ export type CodeLanguage =
 export type DocType = 'text' | 'markdown' | 'richtext' | 'code' | 'html';
 
 export interface Document {
-    id: string;
+    id?: string;
     title: string;
     type: DocumentType;
     language?: CodeLanguage;
@@ -52,8 +52,8 @@ export interface TabInfo {
     id: string;
     title: string;
     isDirty: boolean;
-    documentId: string;
-    type: 'editor' | 'preview' | 'split' | 'terminal' | 'diagram';
+    documentId?: number;
+    type: 'document' | 'editor' | 'preview' | 'split' | 'terminal' | 'diagram';
 }
 
 export const DEFAULT_DOCUMENT_TEMPLATES: Record<DocType, (title: string) => Partial<Document>> = {

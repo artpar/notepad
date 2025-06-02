@@ -10,7 +10,6 @@ import 'remixicon/fonts/remixicon.css';
 import {AnimatePresence, motion} from 'framer-motion';
 
 // Import components
-import AppHeader from './components/Layout/AppHeader';
 import Sidebar from './components/Layout/Sidebar';
 import DocumentEditorPanel from './components/Editor/DocumentEditorPanel';
 import DocumentPreviewPanel from './components/Preview/DocumentPreviewPanel';
@@ -53,7 +52,7 @@ function AppContent() {
 
     const {currentTheme} = useSettings();
     const [dockviewApi, setDockviewApi] = useState<DockviewApi | null>(null);
-    const [savedLayout, setSavedLayout] = useState<SerializedDockview | undefined>(LayoutService.loadLayout());
+    const [savedLayout] = useState<SerializedDockview | undefined>(LayoutService.loadLayout());
     const [showSidebar, setShowSidebar] = useState(true);
     const [isLoading, setIsLoading] = useState(true);
     const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
@@ -69,8 +68,6 @@ function AppContent() {
     // Add welcome screen state
     const [showWelcome, setShowWelcome] = useState(false);
 
-    // Add command palette state
-    const [showCommandPalette, setShowCommandPalette] = useState(false);
 
     // Save layout reference - keeping this outside the lifecycle
     const saveLayoutRef = useRef<() => void>(() => {
@@ -93,7 +90,7 @@ function AppContent() {
         createContextDocument(type, language).then(id => {
             // Open the document in the editor
             if (dockviewApi) {
-                const newDoc = documents.find(doc => parseInt(doc.id) === id);
+                const newDoc = documents.find(doc => doc.id && parseInt(doc.id) === id);
                 if (newDoc) {
                     dockviewApi.addPanel({
                         id: `editor-${id}`, component: 'documentEditor', params: {
@@ -103,7 +100,7 @@ function AppContent() {
                     saveLayoutRef.current();
 
                     // Show success toast
-                    showToast(`Created new ${type} document`, {
+                    showToast(`Created new ${type.type} document`, {
                         type: 'success', duration: 2000
                     });
                 }
@@ -113,10 +110,12 @@ function AppContent() {
 
     // Open document in editor
     const openDocument = useCallback((doc: Document) => {
-        openContextDocument(parseInt(doc.id));
+        if (doc.id) {
+            openContextDocument(parseInt(doc.id));
+        }
 
         // Check if document is already open in editor
-        if (dockviewApi) {
+        if (dockviewApi && doc.id) {
             const panel = dockviewApi.getPanel(`editor-${doc.id}`);
             if (panel) {
                 panel.focus();
@@ -192,36 +191,6 @@ function AppContent() {
         setDocumentToDelete(null);
     }, []);
 
-    // Update document title
-    const updateDocumentTitle = useCallback((title: string) => {
-        if (!activeDocument) return;
-
-        // Create updated document
-        const updatedDoc = {
-            ...activeDocument, title, updatedAt: new Date()
-        };
-
-        // Save document to storage
-        saveDocument(updatedDoc).then(() => {
-            // Update panel titles if they exist
-            if (dockviewApi) {
-                // Update the editor panel
-                const editorPanel = dockviewApi.getPanel(`editor-${activeDocument.id}`);
-                if (editorPanel) {
-                    editorPanel.setTitle(title);
-                }
-
-                // Also update any preview panels that might exist
-                const previewPanel = dockviewApi.getPanel(`preview-${activeDocument.id}`);
-                if (previewPanel) {
-                    previewPanel.setTitle(`Preview: ${title}`);
-                }
-            }
-
-            // Save the updated layout
-            saveLayoutRef.current();
-        });
-    }, [activeDocument, dockviewApi, saveDocument]);
 
     // Export the current document
     const exportDocument = useCallback(() => {
@@ -283,10 +252,11 @@ function AppContent() {
             showToast('Preview closed', {type: 'info', duration: 1500});
         } else {
             // Create panel config
-            const panelConfig: any = {
+            const panelConfig = {
                 id: previewPanelId, component: 'documentPreview', params: {
                     document: activeDocument
-                }, title: `Preview: ${activeDocument.title}`
+                }, title: `Preview: ${activeDocument.title}`,
+                position: undefined as { referencePanel: string; direction: string } | undefined
             };
 
             // Only add position if editor panel exists
@@ -407,10 +377,13 @@ function AppContent() {
                         if (doc) {
                             // Add the document to the panel params
                             panelObject.params.document = doc;
-                            // Set up the update function
-                            panelObject.params.onUpdate = (content: string) => {
-                                updateDocument(docId, content);
-                            };
+                            
+                            // Set up the update function only for editor panels
+                            if (panelObject.component === 'documentEditor') {
+                                panelObject.params.onUpdate = (content: string) => {
+                                    updateDocument(docId, content);
+                                };
+                            }
                         } else {
                             console.warn(`Document with ID ${docId} not found in database`);
                             // Remove this panel if the document doesn't exist anymore
@@ -495,12 +468,6 @@ function AppContent() {
                 return;
             }
 
-            // Ctrl/Cmd + S: Save layout
-            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-                e.preventDefault();
-                saveLayoutRef.current();
-            }
-
             // Ctrl/Cmd + P: Toggle preview
             if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
                 e.preventDefault();
@@ -511,12 +478,6 @@ function AppContent() {
             if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
                 e.preventDefault();
                 createDocument({type: 'text'} as DocumentType);
-            }
-
-            // Ctrl/Cmd + E: Export document
-            if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
-                e.preventDefault();
-                exportDocument();
             }
 
             // Ctrl/Cmd + B: Toggle sidebar
@@ -537,11 +498,6 @@ function AppContent() {
                 setIsSearchOpen(true);
             }
 
-            // Ctrl+K or Cmd+K: Command palette
-            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-                e.preventDefault();
-                setShowCommandPalette(true);
-            }
         };
 
         window.addEventListener('keydown', handleKeyDown);
@@ -628,17 +584,6 @@ function AppContent() {
                     </motion.div>)}
             </AnimatePresence>
 
-            {/* App header */}
-            <AppHeader
-                onSaveLayout={saveLayoutRef.current}
-                onTogglePreview={togglePreview}
-                onExportDocument={exportDocument}
-                onToggleSidebar={toggleSidebar}
-                onOpenSearch={() => setIsSearchOpen(true)}
-                onOpenCommandPalette={() => setShowCommandPalette(true)}
-                showSidebar={showSidebar}
-            />
-
             <div className="app-content flex-1 flex overflow-hidden">
                 {/* Sidebar - conditionally rendered based on showSidebar state */}
                 {showSidebar && (<Sidebar
@@ -648,6 +593,22 @@ function AppContent() {
 
                 {/* Main content area with dockview */}
                 <div className="flex-1 overflow-hidden relative">
+                    {/* Show sidebar button when sidebar is hidden */}
+                    {!showSidebar && (
+                        <button
+                            onClick={toggleSidebar}
+                            className="absolute top-4 left-4 z-40 p-2 rounded-md shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
+                            style={{
+                                backgroundColor: currentTheme.colors.background,
+                                border: `1px solid ${currentTheme.colors.border}`,
+                                color: currentTheme.colors.buttonText
+                            }}
+                            title="Show Sidebar (Ctrl+B)"
+                        >
+                            <i className="ri-menu-unfold-line text-lg"></i>
+                        </button>
+                    )}
+                    
                     <DockviewReact
                         components={components}
                         onReady={handleDockviewReady}

@@ -67,7 +67,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       for (const id of dirtyDocs) {
         if (pendingSaves.current.has(id)) continue; // Skip if already saving
 
-        const doc = documents.find(d => parseInt(d.id) === id);
+        const doc = documents.find(d => d.id && parseInt(d.id) === id);
         if (doc) {
           await saveDocument(doc);
         }
@@ -93,7 +93,6 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
 
     const newDoc: Document = {
-      id: "",
       title,
       content: content,
       type,
@@ -138,13 +137,13 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setActiveTabId(openTabs[existingTabIndex].id);
 
       // Find the document and set it as active
-      const doc = documents.find(d => parseInt(d.id) === id);
+      const doc = documents.find(d => d.id && parseInt(d.id) === id);
       if (doc) {
         setActiveDocument(doc);
       }
     } else {
       // Try to find document in memory first
-      let document = documents.find(d => parseInt(d.id) === id);
+      let document = documents.find(d => d.id && parseInt(d.id) === id);
 
       // If not found in memory, load from storage
       if (!document) {
@@ -152,7 +151,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         // Add to documents list if found
         if (document) {
-          setDocuments(prev => [...prev.filter(d => parseInt(d.id) !== id), document!]);
+          setDocuments(prev => [...prev.filter(d => d.id && parseInt(d.id) !== id), document!]);
         }
       }
 
@@ -198,7 +197,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       // Update documents list
       setDocuments(prev => {
-        const index = prev.findIndex(d => parseInt(d.id) === docId);
+        const index = prev.findIndex(d => d.id && parseInt(d.id) === docId);
         if (index >= 0) {
           const newDocs = [...prev];
           newDocs[index] = document;
@@ -314,7 +313,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const updateDocumentTitle = async (id: number, title: string): Promise<void> => {
     // Find the document
-    const doc = documents.find(d => parseInt(d.id) === id);
+    const doc = documents.find(d => d.id && parseInt(d.id) === id);
     if (!doc) return;
 
     // Update document with new title
@@ -347,7 +346,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const updateDocumentTags = async (id: number, tags: string[]): Promise<void> => {
     // Find the document
-    const doc = documents.find(d => parseInt(d.id) === id);
+    const doc = documents.find(d => d.id && parseInt(d.id) === id);
     if (!doc) return;
 
     // Update document with new tags
@@ -377,7 +376,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setActiveTabId(tabId);
 
       if (tab.documentId) {
-        const doc = documents.find(d => parseInt(d.id) === tab.documentId);
+        const doc = documents.find(d => d.id && parseInt(d.id) === tab.documentId);
         setActiveDocument(doc || null);
       } else {
         setActiveDocument(null);
@@ -391,7 +390,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (tab && tab.documentId) {
       // Only close the tab, don't delete the document
       if (documentStates[tab.documentId]?.isDirty) {
-        const doc = documents.find(d => parseInt(d.id) === tab.documentId);
+        const doc = documents.find(d => d.id && parseInt(d.id) === tab.documentId);
         if (doc) {
           await saveDocument(doc);
         }
@@ -408,7 +407,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setActiveTabId(lastTab.id);
 
         if (lastTab.documentId) {
-          const doc = documents.find(d => parseInt(d.id) === lastTab.documentId);
+          const doc = documents.find(d => d.id && parseInt(d.id) === lastTab.documentId);
           setActiveDocument(doc || null);
         } else {
           setActiveDocument(null);
