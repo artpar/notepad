@@ -16,10 +16,6 @@ import {useDocuments} from "../../contexts/UseDocuments.tsx";
 import {DocumentType} from "../../types/DocumentType.tsx";
 import {useToast} from '../UI/ToastSystem';
 
-enum SidebarTab {
-    Files = 'files', Search = 'search', Settings = 'settings'
-}
-
 interface SidebarProps {
     onToggleSidebar: () => void;
     onSelectDocument?: (doc: Document) => void;
@@ -30,36 +26,28 @@ const Sidebar: React.FC<SidebarProps> = ({onToggleSidebar, onSelectDocument}) =>
     const {
         documents,
         activeDocument,
-        openDocument,
         createDocument,
         closeDocument,
         updateDocumentTitle,
-        updateDocumentTags,
         searchDocuments,
         saveDocument,
         documentStates
     } = useDocuments();
-    const {getDocumentIcon} = useDocumentActions();
     const {getShortcutKey} = useKeyboardShortcuts();
     const {showToast} = useToast();
 
     // State
-    const [activeTab, setActiveTab] = useState<SidebarTab>(SidebarTab.Files);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<Document[]>([]);
     const [isSearching, setIsSearching] = useState(false);
-    const [width, setWidth] = useState(260); // Default width
+    const [width, setWidth] = useState(260);
     const [isResizing, setIsResizing] = useState(false);
     const [createMenuOpen, setCreateMenuOpen] = useState(false);
     const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
     const [documentToRename, setDocumentToRename] = useState<Document | null>(null);
     const [newDocumentTitle, setNewDocumentTitle] = useState('');
-    const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
-    const [filterTag, setFilterTag] = useState<string | null>(null);
     const [sortOption, setSortOption] = useState<'name' | 'date' | 'type'>('date');
-    const [showHelpMenu, setShowHelpMenu] = useState(false);
-    const [showFilterMenu, setShowFilterMenu] = useState(false);
-    const [showSortMenu, setShowSortMenu] = useState(false);
+    const [showOptionsMenu, setShowOptionsMenu] = useState(false);
 
     // Refs
     const sidebarRef = useRef<HTMLDivElement>(null);
@@ -91,37 +79,18 @@ const Sidebar: React.FC<SidebarProps> = ({onToggleSidebar, onSelectDocument}) =>
         return () => clearTimeout(timer);
     }, [searchQuery, searchDocuments]);
 
-    // Define document tags
+    // Get unique tags from documents
     const tags = useMemo(() => {
         const tagSet = new Set<string>();
         documents.forEach(doc => {
             doc.tags?.forEach(tag => tagSet.add(tag));
-            tagSet.add(doc.type.type);
-            if (doc.type.type === 'code' && doc.language) {
-                tagSet.add(doc.language);
-            }
         });
         return Array.from(tagSet);
     }, [documents]);
 
     // Filter and sort documents
     const filteredDocuments = useMemo(() => {
-        // If we're searching, return search results
-        if (activeTab === SidebarTab.Search && searchQuery) {
-            return searchResults;
-        }
-
-        let filtered = [...documents];
-
-        // Apply search filter in Files tab
-        if (activeTab === SidebarTab.Files && searchQuery) {
-            filtered = filtered.filter(doc => doc.title.toLowerCase().includes(searchQuery.toLowerCase()) || doc.content.toLowerCase().includes(searchQuery.toLowerCase()) || doc.type.type.toLowerCase().includes(searchQuery.toLowerCase()) || (doc.language && doc.language.toLowerCase().includes(searchQuery.toLowerCase())) || (doc.tags && doc.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))));
-        }
-
-        // Apply tag filter
-        if (filterTag) {
-            filtered = filtered.filter(doc => doc.type.type === filterTag || doc.language === filterTag || (doc.tags && doc.tags.includes(filterTag)));
-        }
+        let filtered = searchQuery ? searchResults : [...documents];
 
         // Apply sorting
         filtered.sort((a, b) => {
@@ -129,7 +98,7 @@ const Sidebar: React.FC<SidebarProps> = ({onToggleSidebar, onSelectDocument}) =>
                 case 'name':
                     return a.title.localeCompare(b.title);
                 case 'type':
-                    return a.type.type.localeCompare(b.type);
+                    return a.type.type.localeCompare(b.type.type);
                 case 'date':
                 default:
                     return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
@@ -137,7 +106,7 @@ const Sidebar: React.FC<SidebarProps> = ({onToggleSidebar, onSelectDocument}) =>
         });
 
         return filtered;
-    }, [documents, searchQuery, filterTag, sortOption, activeTab, searchResults]);
+    }, [documents, searchQuery, sortOption, searchResults]);
 
     // Handle document creation
     const handleNewFile = useCallback((type: string, language?: string) => {
@@ -306,6 +275,10 @@ const Sidebar: React.FC<SidebarProps> = ({onToggleSidebar, onSelectDocument}) =>
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [handleManualSave, handleExport]);
 
+    // Check if document needs manual save
+    const needsSave = activeDocument && !settings.editor.autoSave && 
+                     documentStates[parseInt(activeDocument.id)]?.isDirty;
+
     return (<>
             {/* Confirmation modals */}
             <ConfirmationModal
@@ -363,20 +336,20 @@ const Sidebar: React.FC<SidebarProps> = ({onToggleSidebar, onSelectDocument}) =>
                     borderColor: currentTheme.colors.border
                 }}
             >
-                {/* Sidebar header */}
-                <div className="sidebar-header flex items-center justify-between p-2 border-b"
+                {/* Streamlined Header */}
+                <div className="flex items-center justify-between p-3 border-b"
                      style={{borderColor: currentTheme.colors.border}}
                 >
-                    <div className="flex items-center">
+                    <div className="flex items-center gap-2">
                         <IconButton
                             icon="menu-fold-line"
                             onClick={onToggleSidebar}
                             title="Hide Sidebar"
                         />
-                        <h2 className="ml-2 font-medium">Documents</h2>
+                        <h2 className="font-medium">Documents</h2>
                     </div>
 
-                    <div className="flex items-center">
+                    <div className="flex items-center gap-1">
                         <MenuButton
                             icon="add-line"
                             isOpen={createMenuOpen}
@@ -386,16 +359,65 @@ const Sidebar: React.FC<SidebarProps> = ({onToggleSidebar, onSelectDocument}) =>
                             <DocumentTypeMenu onSelectType={handleNewFile}/>
                         </MenuButton>
 
-                        <IconButton
-                            icon={viewMode === 'list' ? 'list-check' : 'grid-fill'}
-                            onClick={() => setViewMode(viewMode === 'list' ? 'grid' : 'list')}
-                            title={viewMode === 'list' ? 'Switch to Grid View' : 'Switch to List View'}
-                        />
+                        <MenuButton
+                            icon="more-fill"
+                            isOpen={showOptionsMenu}
+                            onClick={() => setShowOptionsMenu(!showOptionsMenu)}
+                            title="Options"
+                        >
+                            <div className="p-2 min-w-[160px]">
+                                <div className="space-y-1">
+                                    {/* Sort options */}
+                                    <div className="px-2 py-1 text-xs font-medium opacity-50">Sort by</div>
+                                    {(['date', 'name', 'type'] as const).map(option => (
+                                        <button
+                                            key={option}
+                                            className={`w-full text-left px-3 py-1.5 text-sm rounded hover:bg-opacity-10 hover:bg-gray-500 flex items-center ${sortOption === option ? 'font-medium' : ''}`}
+                                            style={{
+                                                backgroundColor: sortOption === option ? currentTheme.colors.buttonActiveBackground : 'transparent',
+                                            }}
+                                            onClick={() => {
+                                                setSortOption(option);
+                                                setShowOptionsMenu(false);
+                                            }}
+                                        >
+                                            <i className={`ri-${option === 'date' ? 'time' : option === 'name' ? 'sort-alphabet' : 'folder-2'}-line mr-2`}></i>
+                                            {option === 'date' ? 'Last modified' : option === 'name' ? 'Name' : 'Type'}
+                                        </button>
+                                    ))}
+                                    
+                                    <div className="my-1 border-t" style={{borderColor: currentTheme.colors.border}}></div>
+                                    
+                                    {/* Theme toggle */}
+                                    <button
+                                        className="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-opacity-10 hover:bg-gray-500 flex items-center"
+                                        onClick={() => {
+                                            toggleTheme();
+                                            setShowOptionsMenu(false);
+                                        }}
+                                    >
+                                        <i className={`ri-${currentTheme.isDark ? 'sun' : 'moon'}-line mr-2`}></i>
+                                        {currentTheme.isDark ? 'Light Mode' : 'Dark Mode'}
+                                    </button>
+
+                                    {/* Help */}
+                                    <MenuButton
+                                        icon="question-line"
+                                        onClick={() => {}}
+                                        title="Help"
+                                        className="w-full !p-0"
+                                        dropdownAlign="left"
+                                    >
+                                        <HelpMenu getShortcutKey={getShortcutKey}/>
+                                    </MenuButton>
+                                </div>
+                            </div>
+                        </MenuButton>
                     </div>
                 </div>
 
                 {/* Search bar */}
-                <div className="p-2 border-b" style={{borderColor: currentTheme.colors.border}}>
+                <div className="p-3">
                     <SearchBar
                         value={searchQuery}
                         onChange={setSearchQuery}
@@ -405,103 +427,15 @@ const Sidebar: React.FC<SidebarProps> = ({onToggleSidebar, onSelectDocument}) =>
                     />
                 </div>
 
-                {/* Filters and Sort */}
-                <div className="p-2 border-b space-y-2" style={{borderColor: currentTheme.colors.border}}>
-                    {/* Filter and Sort controls in one row */}
-                    <div className="flex items-center justify-between gap-2">
-                        {/* Filter dropdown */}
-                        <MenuButton
-                            icon={filterTag ? "filter-2-fill" : "filter-2-line"}
-                            onClick={() => setShowFilterMenu(!showFilterMenu)}
-                            title="Filter documents"
-                            isOpen={showFilterMenu}
-                            dropdownAlign="left"
-                        >
-                            <div className="p-2">
-                                <div className="text-xs font-medium mb-2 opacity-70">Filter by type/tag</div>
-                                <div className="space-y-1 max-h-48 overflow-y-auto">
-                                    <button
-                                        className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-opacity-10 hover:bg-gray-500 ${!filterTag ? 'font-medium' : ''}`}
-                                        style={{
-                                            backgroundColor: !filterTag ? currentTheme.colors.buttonActiveBackground : 'transparent',
-                                        }}
-                                        onClick={() => {
-                                            setFilterTag(null);
-                                            setShowFilterMenu(false);
-                                        }}
-                                    >
-                                        All documents
-                                    </button>
-                                    {tags.map(tag => (<button
-                                            key={tag}
-                                            className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-opacity-10 hover:bg-gray-500 ${filterTag === tag ? 'font-medium' : ''}`}
-                                            style={{
-                                                backgroundColor: filterTag === tag ? currentTheme.colors.buttonActiveBackground : 'transparent',
-                                            }}
-                                            onClick={() => {
-                                                setFilterTag(tag);
-                                                setShowFilterMenu(false);
-                                            }}
-                                        >
-                                            {tag}
-                                        </button>))}
-                                </div>
-                            </div>
-                        </MenuButton>
-
-                        {/* Sort dropdown */}
-                        <MenuButton
-                            icon="sort-desc"
-                            onClick={() => setShowSortMenu(!showSortMenu)}
-                            title="Sort documents"
-                            isOpen={showSortMenu}
-                            dropdownAlign="right"
-                        >
-                            <div className="p-2">
-                                <div className="text-xs font-medium mb-2 opacity-70">Sort by</div>
-                                <div className="space-y-1">
-                                    {(['date', 'name', 'type'] as const).map(option => (<button
-                                            key={option}
-                                            className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-opacity-10 hover:bg-gray-500 ${sortOption === option ? 'font-medium' : ''}`}
-                                            style={{
-                                                backgroundColor: sortOption === option ? currentTheme.colors.buttonActiveBackground : 'transparent',
-                                            }}
-                                            onClick={() => {
-                                                setSortOption(option);
-                                                setShowSortMenu(false);
-                                            }}
-                                        >
-                                            <i className={`ri-${option === 'date' ? 'time' : option === 'name' ? 'file-text' : 'folder-2'}-line mr-2`}></i>
-                                            {option === 'date' ? 'Last modified' : option === 'name' ? 'Name' : 'Type'}
-                                        </button>))}
-                                </div>
-                            </div>
-                        </MenuButton>
-                    </div>
-
-                    {/* Active filter indicator */}
-                    {filterTag && (<div className="flex items-center text-xs">
-                            <span className="opacity-70">Filtered by:</span>
-                            <span className="ml-1 px-2 py-0.5 rounded"
-                                  style={{backgroundColor: currentTheme.colors.buttonActiveBackground}}>
-                {filterTag}
-              </span>
-                            <button
-                                className="ml-2 opacity-70 hover:opacity-100"
-                                onClick={() => setFilterTag(null)}
-                            >
-                                <i className="ri-close-line"></i>
-                            </button>
-                        </div>)}
-                </div>
-
                 {/* Document list */}
-                <div className="flex-1 overflow-y-auto p-2">
-                    {filteredDocuments.length === 0 ? (<div className="text-center py-8 opacity-70">
+                <div className="flex-1 overflow-y-auto px-2">
+                    {filteredDocuments.length === 0 ? (
+                        <div className="text-center py-12 opacity-50">
                             <i className="ri-file-search-line text-3xl mb-2"></i>
-                            <p>{searchQuery ? 'No documents found' : 'No documents yet'}</p>
-                            {searchQuery && (<button
-                                    className="mt-2 px-3 py-1 rounded text-sm"
+                            <p className="text-sm">{searchQuery ? 'No documents found' : 'No documents yet'}</p>
+                            {searchQuery && (
+                                <button
+                                    className="mt-2 px-3 py-1 rounded text-xs hover:opacity-80"
                                     style={{
                                         backgroundColor: currentTheme.colors.buttonBackground,
                                         color: currentTheme.colors.buttonText
@@ -509,82 +443,66 @@ const Sidebar: React.FC<SidebarProps> = ({onToggleSidebar, onSelectDocument}) =>
                                     onClick={() => setSearchQuery('')}
                                 >
                                     Clear search
-                                </button>)}
-                        </div>) : (<div className={viewMode === 'grid' ? 'grid grid-cols-2 gap-2' : 'space-y-1'}>
-                            {filteredDocuments.map(doc => (<DocumentItem
+                                </button>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="space-y-1 pb-2">
+                            {filteredDocuments.map(doc => (
+                                <DocumentItem
                                     key={doc.id}
                                     document={doc}
                                     isActive={activeDocument?.id === doc.id}
                                     onClick={() => onSelectDocument && onSelectDocument(doc)}
                                     onContextMenu={(e) => handleContextMenu(e, doc)}
-                                    viewMode={viewMode}
-                                />))}
-                        </div>)}
+                                    viewMode="list"
+                                />
+                            ))}
+                        </div>
+                    )}
                 </div>
 
-                {/* Sidebar footer with actions and info */}
-                <div className="border-t p-2 flex flex-col gap-2" style={{borderColor: currentTheme.colors.border}}>
-                    {/* Document actions */}
-                    {activeDocument && (<div className="flex items-center gap-1">
+                {/* Minimalistic footer - only shows when needed */}
+                {(activeDocument || documents.length > 0) && (
+                    <div className="border-t px-3 py-2 flex items-center justify-between"
+                         style={{borderColor: currentTheme.colors.border}}
+                    >
+                        <div className="flex items-center gap-1">
                             {/* Save button (only show if manual save is needed) */}
-                            {!settings.editor.autoSave && documentStates[parseInt(activeDocument.id)]?.isDirty && (
+                            {needsSave && (
                                 <IconButton
                                     icon="save-line"
                                     onClick={handleManualSave}
-                                    title="Save (Ctrl/Cmd+S)"
-                                    className="text-yellow-600"
-                                />)}
+                                    title={`Save ${getShortcutKey('Cmd')}S`}
+                                    className="text-yellow-500"
+                                />
+                            )}
 
                             {/* Export button */}
-                            <IconButton
-                                icon="download-line"
-                                onClick={handleExport}
-                                title="Export (Ctrl/Cmd+E)"
-                            />
-
-                            <div className="flex-1"/>
-
-                            {/* Document status */}
-                            <span className="text-xs opacity-50">
-                {documentStates[parseInt(activeDocument.id)]?.isSaving && (<span className="mr-2">
-                    <i className="ri-loader-4-line animate-spin"></i> Saving...
-                  </span>)}
-                                {documentStates[parseInt(activeDocument.id)]?.isDirty && !settings.editor.autoSave && (
-                                    <span className="text-yellow-600">Unsaved</span>)}
-              </span>
-                        </div>)}
-
-                    {/* Bottom row with theme toggle and help */}
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-1">
-                            {/* Theme toggle */}
-                            <IconButton
-                                icon={currentTheme.isDark ? 'sun-line' : 'moon-line'}
-                                onClick={toggleTheme}
-                                title="Toggle Light/Dark Theme"
-                            />
-
-                            {/* Help menu */}
-                            <MenuButton
-                                icon="question-line"
-                                isOpen={showHelpMenu}
-                                onClick={() => setShowHelpMenu(!showHelpMenu)}
-                                title="Help & Keyboard Shortcuts"
-                            >
-                                <HelpMenu getShortcutKey={getShortcutKey}/>
-                            </MenuButton>
+                            {activeDocument && (
+                                <IconButton
+                                    icon="download-line"
+                                    onClick={handleExport}
+                                    title={`Export ${getShortcutKey('Cmd')}E`}
+                                />
+                            )}
                         </div>
 
                         <div className="text-xs opacity-50">
-                            {documents.length} documents
+                            {activeDocument && documentStates[parseInt(activeDocument.id)]?.isSaving && (
+                                <span className="mr-2">
+                                    <i className="ri-loader-4-line animate-spin"></i> Saving...
+                                </span>
+                            )}
+                            {documents.length} {documents.length === 1 ? 'document' : 'documents'}
                         </div>
                     </div>
-                </div>
+                )}
 
                 {/* Resize handle */}
                 <div
                     ref={resizeRef}
-                    className="absolute top-0 right-0 w-1 h-full cursor-ew-resize hover:bg-opacity-50 hover:bg-gray-500"
+                    className="absolute top-0 right-0 w-1 h-full cursor-ew-resize hover:bg-opacity-20 hover:bg-gray-500 transition-colors"
                     onMouseDown={() => setIsResizing(true)}
                 />
             </div>
