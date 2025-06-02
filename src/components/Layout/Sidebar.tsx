@@ -15,6 +15,8 @@ import useKeyboardShortcuts from '../../hooks/useKeyboardShortcuts';
 import 'remixicon/fonts/remixicon.css';
 import {useDocuments} from "../../contexts/UseDocuments.tsx";
 import {DocumentType} from "../../types/DocumentType.tsx";
+import { useToast } from '../UI/ToastSystem';
+import * as StorageService from '../../services/storage';
 
 enum SidebarTab {
   Files = 'files',
@@ -28,7 +30,7 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ onToggleSidebar, onSelectDocument }) => {
-  const { currentTheme, toggleTheme } = useSettings();
+  const { currentTheme, toggleTheme, settings } = useSettings();
   const {
     documents,
     activeDocument,
@@ -37,10 +39,13 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleSidebar, onSelectDocument }) 
     closeDocument,
     updateDocumentTitle,
     updateDocumentTags,
-    searchDocuments
+    searchDocuments,
+    saveDocument,
+    documentStates
   } = useDocuments();
   const { getDocumentIcon } = useDocumentActions();
   const { getShortcutKey } = useKeyboardShortcuts();
+  const { showToast } = useToast();
 
   // State
   const [activeTab, setActiveTab] = useState<SidebarTab>(SidebarTab.Files);
@@ -191,6 +196,59 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleSidebar, onSelectDocument }) 
     setContextMenu({position: null, document: null});
   }, []);
 
+  // Handle manual save
+  const handleManualSave = useCallback(async () => {
+    if (activeDocument && activeDocument.id) {
+      try {
+        await saveDocument(activeDocument);
+        showToast('Document saved', { type: 'success' });
+      } catch (error) {
+        showToast('Failed to save document', { type: 'error' });
+      }
+    }
+  }, [activeDocument, saveDocument, showToast]);
+
+  // Handle export
+  const handleExport = useCallback(() => {
+    if (!activeDocument) {
+      showToast('No document to export', { type: 'warning' });
+      return;
+    }
+
+    const getFileExtension = (type: string): string => {
+      switch (type) {
+        case 'markdown':
+          return 'md';
+        case 'javascript':
+          return 'js';
+        case 'python':
+          return 'py';
+        case 'html':
+          return 'html';
+        default:
+          return 'txt';
+      }
+    };
+
+    try {
+      const blob = new Blob([activeDocument.content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const fileName = `${activeDocument.title}.${getFileExtension(activeDocument.type.type)}`;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showToast(`Exported "${fileName}" successfully`, { type: 'success' });
+    } catch (error) {
+      console.error('Error exporting document:', error);
+      showToast('Failed to export document', { type: 'error' });
+    }
+  }, [activeDocument, showToast]);
+
   // Get context menu items
   const getContextMenuItems = useMemo(() => {
     if (!contextMenu.document) return [];
@@ -260,6 +318,26 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleSidebar, onSelectDocument }) 
       document.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isResizing]);
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + S to save
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        handleManualSave();
+      }
+
+      // Ctrl/Cmd + E to export
+      if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+        e.preventDefault();
+        handleExport();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleManualSave, handleExport]);
 
   return (
     <>
@@ -493,29 +571,68 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleSidebar, onSelectDocument }) 
           )}
         </div>
 
-        {/* Sidebar footer with theme toggle and help */}
-        <div className="border-t p-2 flex items-center justify-between" style={{ borderColor: currentTheme.colors.border }}>
-          <div className="flex items-center space-x-1">
-            {/* Theme toggle */}
-            <IconButton
-              icon={currentTheme.isDark ? 'sun-line' : 'moon-line'}
-              onClick={toggleTheme}
-              title="Toggle Light/Dark Theme"
-            />
-            
-            {/* Help menu */}
-            <MenuButton
-              icon="question-line"
-              isOpen={showHelpMenu}
-              onClick={() => setShowHelpMenu(!showHelpMenu)}
-              title="Help & Keyboard Shortcuts"
-            >
-              <HelpMenu getShortcutKey={getShortcutKey} />
-            </MenuButton>
-          </div>
+        {/* Sidebar footer with actions and info */}
+        <div className="border-t p-2 flex flex-col gap-2" style={{ borderColor: currentTheme.colors.border }}>
+          {/* Document actions */}
+          {activeDocument && (
+            <div className="flex items-center gap-1">
+              {/* Save button (only show if manual save is needed) */}
+              {!settings.editor.autoSave && documentStates[parseInt(activeDocument.id)]?.isDirty && (
+                <IconButton
+                  icon="save-line"
+                  onClick={handleManualSave}
+                  title="Save (Ctrl/Cmd+S)"
+                  className="text-yellow-600"
+                />
+              )}
+              
+              {/* Export button */}
+              <IconButton
+                icon="download-line"
+                onClick={handleExport}
+                title="Export (Ctrl/Cmd+E)"
+              />
+              
+              <div className="flex-1" />
+              
+              {/* Document status */}
+              <span className="text-xs opacity-50">
+                {documentStates[parseInt(activeDocument.id)]?.isSaving && (
+                  <span className="mr-2">
+                    <i className="ri-loader-4-line animate-spin"></i> Saving...
+                  </span>
+                )}
+                {documentStates[parseInt(activeDocument.id)]?.isDirty && !settings.editor.autoSave && (
+                  <span className="text-yellow-600">Unsaved</span>
+                )}
+              </span>
+            </div>
+          )}
           
-          <div className="text-xs opacity-50">
-            {documents.length} documents
+          {/* Bottom row with theme toggle and help */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-1">
+              {/* Theme toggle */}
+              <IconButton
+                icon={currentTheme.isDark ? 'sun-line' : 'moon-line'}
+                onClick={toggleTheme}
+                title="Toggle Light/Dark Theme"
+              />
+              
+              {/* Help menu */}
+              <MenuButton
+                icon="question-line"
+                isOpen={showHelpMenu}
+                onClick={() => setShowHelpMenu(!showHelpMenu)}
+                title="Help & Keyboard Shortcuts"
+              >
+                <HelpMenu getShortcutKey={getShortcutKey} />
+              </MenuButton>
+            </div>
+            
+            <div className="text-xs opacity-50">
+              {documents.length} documents
+            </div>
           </div>
         </div>
 
