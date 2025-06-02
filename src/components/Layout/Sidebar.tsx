@@ -1,650 +1,594 @@
 // src/components/Layout/Sidebar.tsx
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSettings } from '../../contexts/SettingsContext';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {useSettings} from '../../contexts/SettingsContext';
 import useDocumentActions from '../../hooks/useDocumentActions';
-import { Document } from '../../types/document';
+import {Document} from '../../types/document';
 import DocumentItem from './DocumentItem';
 import SearchBar from '../UI/SearchBar';
 import ConfirmationModal from '../UI/ConfirmationModal';
 import ContextMenu from '../UI/ContextMenu';
-import { IconButton, MenuButton } from '../UI/Buttons';
+import {IconButton, MenuButton} from '../UI/Buttons';
 import DocumentTypeMenu from '../UI/DocumentTypeMenu';
-import TagSelector from '../UI/TagSelector';
 import HelpMenu from '../UI/HelpMenu';
 import useKeyboardShortcuts from '../../hooks/useKeyboardShortcuts';
 import 'remixicon/fonts/remixicon.css';
 import {useDocuments} from "../../contexts/UseDocuments.tsx";
 import {DocumentType} from "../../types/DocumentType.tsx";
-import { useToast } from '../UI/ToastSystem';
-import * as StorageService from '../../services/storage';
+import {useToast} from '../UI/ToastSystem';
 
 enum SidebarTab {
-  Files = 'files',
-  Search = 'search',
-  Settings = 'settings'
+    Files = 'files', Search = 'search', Settings = 'settings'
 }
 
 interface SidebarProps {
-  onToggleSidebar: () => void;
-  onSelectDocument?: (doc: Document) => void;
+    onToggleSidebar: () => void;
+    onSelectDocument?: (doc: Document) => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ onToggleSidebar, onSelectDocument }) => {
-  const { currentTheme, toggleTheme, settings } = useSettings();
-  const {
-    documents,
-    activeDocument,
-    openDocument,
-    createDocument,
-    closeDocument,
-    updateDocumentTitle,
-    updateDocumentTags,
-    searchDocuments,
-    saveDocument,
-    documentStates
-  } = useDocuments();
-  const { getDocumentIcon } = useDocumentActions();
-  const { getShortcutKey } = useKeyboardShortcuts();
-  const { showToast } = useToast();
+const Sidebar: React.FC<SidebarProps> = ({onToggleSidebar, onSelectDocument}) => {
+    const {currentTheme, toggleTheme, settings} = useSettings();
+    const {
+        documents,
+        activeDocument,
+        openDocument,
+        createDocument,
+        closeDocument,
+        updateDocumentTitle,
+        updateDocumentTags,
+        searchDocuments,
+        saveDocument,
+        documentStates
+    } = useDocuments();
+    const {getDocumentIcon} = useDocumentActions();
+    const {getShortcutKey} = useKeyboardShortcuts();
+    const {showToast} = useToast();
 
-  // State
-  const [activeTab, setActiveTab] = useState<SidebarTab>(SidebarTab.Files);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Document[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [width, setWidth] = useState(260); // Default width
-  const [isResizing, setIsResizing] = useState(false);
-  const [createMenuOpen, setCreateMenuOpen] = useState(false);
-  const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
-  const [documentToRename, setDocumentToRename] = useState<Document | null>(null);
-  const [newDocumentTitle, setNewDocumentTitle] = useState('');
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
-  const [filterTag, setFilterTag] = useState<string | null>(null);
-  const [sortOption, setSortOption] = useState<'name' | 'date' | 'type'>('date');
-  const [showHelpMenu, setShowHelpMenu] = useState(false);
-  const [showFilterMenu, setShowFilterMenu] = useState(false);
-  const [showSortMenu, setShowSortMenu] = useState(false);
+    // State
+    const [activeTab, setActiveTab] = useState<SidebarTab>(SidebarTab.Files);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<Document[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [width, setWidth] = useState(260); // Default width
+    const [isResizing, setIsResizing] = useState(false);
+    const [createMenuOpen, setCreateMenuOpen] = useState(false);
+    const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
+    const [documentToRename, setDocumentToRename] = useState<Document | null>(null);
+    const [newDocumentTitle, setNewDocumentTitle] = useState('');
+    const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+    const [filterTag, setFilterTag] = useState<string | null>(null);
+    const [sortOption, setSortOption] = useState<'name' | 'date' | 'type'>('date');
+    const [showHelpMenu, setShowHelpMenu] = useState(false);
+    const [showFilterMenu, setShowFilterMenu] = useState(false);
+    const [showSortMenu, setShowSortMenu] = useState(false);
 
-  // Refs
-  const sidebarRef = useRef<HTMLDivElement>(null);
-  const resizeRef = useRef<HTMLDivElement>(null);
+    // Refs
+    const sidebarRef = useRef<HTMLDivElement>(null);
+    const resizeRef = useRef<HTMLDivElement>(null);
 
-  // Context menu state
-  const [contextMenu, setContextMenu] = useState<{
-    position: { x: number; y: number } | null;
-    document: Document | null
-  }>({
-    position: null,
-    document: null
-  });
-
-  // Debounce search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchQuery.trim()) {
-        setIsSearching(true);
-        searchDocuments(searchQuery)
-          .then(results => {
-            setSearchResults(results);
-            setIsSearching(false);
-          })
-          .catch(() => setIsSearching(false));
-      } else {
-        setSearchResults([]);
-      }
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [searchQuery, searchDocuments]);
-
-  // Define document tags
-  const tags = useMemo(() => {
-    const tagSet = new Set<string>();
-    documents.forEach(doc => {
-      doc.tags?.forEach(tag => tagSet.add(tag));
-      tagSet.add(doc.type.type);
-      if (doc.type.type === 'code' && doc.language) {
-        tagSet.add(doc.language);
-      }
-    });
-    return Array.from(tagSet);
-  }, [documents]);
-
-  // Filter and sort documents
-  const filteredDocuments = useMemo(() => {
-    // If we're searching, return search results
-    if (activeTab === SidebarTab.Search && searchQuery) {
-      return searchResults;
-    }
-
-    let filtered = [...documents];
-
-    // Apply search filter in Files tab
-    if (activeTab === SidebarTab.Files && searchQuery) {
-      filtered = filtered.filter(doc =>
-        doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        doc.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        doc.type.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (doc.language && doc.language.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (doc.tags && doc.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())))
-      );
-    }
-
-    // Apply tag filter
-    if (filterTag) {
-      filtered = filtered.filter(doc =>
-        doc.type.type === filterTag ||
-        doc.language === filterTag ||
-        (doc.tags && doc.tags.includes(filterTag))
-      );
-    }
-
-    // Apply sorting
-    filtered.sort((a, b) => {
-      switch (sortOption) {
-        case 'name':
-          return a.title.localeCompare(b.title);
-        case 'type':
-          return a.type.type.localeCompare(b.type);
-        case 'date':
-        default:
-          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-      }
+    // Context menu state
+    const [contextMenu, setContextMenu] = useState<{
+        position: { x: number; y: number } | null; document: Document | null
+    }>({
+        position: null, document: null
     });
 
-    return filtered;
-  }, [documents, searchQuery, filterTag, sortOption, activeTab, searchResults]);
+    // Debounce search
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (searchQuery.trim()) {
+                setIsSearching(true);
+                searchDocuments(searchQuery)
+                    .then(results => {
+                        setSearchResults(results);
+                        setIsSearching(false);
+                    })
+                    .catch(() => setIsSearching(false));
+            } else {
+                setSearchResults([]);
+            }
+        }, 300);
 
-  // Handle document creation
-  const handleNewFile = useCallback((type: string, language?: string) => {
-    createDocument({type: type} as DocumentType, language);
-    setCreateMenuOpen(false);
-  }, [createDocument]);
+        return () => clearTimeout(timer);
+    }, [searchQuery, searchDocuments]);
 
-  // Handle document deletion
-  const handleDeleteDocument = useCallback((doc: Document) => {
-    setDocumentToDelete(doc);
-  }, []);
+    // Define document tags
+    const tags = useMemo(() => {
+        const tagSet = new Set<string>();
+        documents.forEach(doc => {
+            doc.tags?.forEach(tag => tagSet.add(tag));
+            tagSet.add(doc.type.type);
+            if (doc.type.type === 'code' && doc.language) {
+                tagSet.add(doc.language);
+            }
+        });
+        return Array.from(tagSet);
+    }, [documents]);
 
-  // Handle delete confirmation
-  const handleConfirmDelete = useCallback(() => {
-    if (documentToDelete && documentToDelete.id) {
-      closeDocument(documentToDelete.id);
-      setDocumentToDelete(null);
-    }
-  }, [documentToDelete, closeDocument]);
-
-  // Handle rename confirmation
-  const handleConfirmRename = useCallback(() => {
-    if (documentToRename && documentToRename.id && newDocumentTitle.trim()) {
-      updateDocumentTitle(documentToRename.id, newDocumentTitle);
-      setDocumentToRename(null);
-    }
-  }, [documentToRename, newDocumentTitle, updateDocumentTitle]);
-
-  // Handle context menu
-  const handleContextMenu = useCallback((e: React.MouseEvent, doc: Document) => {
-    e.preventDefault();
-    setContextMenu({
-      position: {x: e.clientX, y: e.clientY},
-      document: doc
-    });
-  }, []);
-
-  // Close context menu
-  const closeContextMenu = useCallback(() => {
-    setContextMenu({position: null, document: null});
-  }, []);
-
-  // Handle manual save
-  const handleManualSave = useCallback(async () => {
-    if (activeDocument && activeDocument.id) {
-      try {
-        await saveDocument(activeDocument);
-        showToast('Document saved', { type: 'success' });
-      } catch (error) {
-        showToast('Failed to save document', { type: 'error' });
-      }
-    }
-  }, [activeDocument, saveDocument, showToast]);
-
-  // Handle export
-  const handleExport = useCallback(() => {
-    if (!activeDocument) {
-      showToast('No document to export', { type: 'warning' });
-      return;
-    }
-
-    const getFileExtension = (type: string): string => {
-      switch (type) {
-        case 'markdown':
-          return 'md';
-        case 'javascript':
-          return 'js';
-        case 'python':
-          return 'py';
-        case 'html':
-          return 'html';
-        default:
-          return 'txt';
-      }
-    };
-
-    try {
-      const blob = new Blob([activeDocument.content], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const fileName = `${activeDocument.title}.${getFileExtension(activeDocument.type.type)}`;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      showToast(`Exported "${fileName}" successfully`, { type: 'success' });
-    } catch (error) {
-      console.error('Error exporting document:', error);
-      showToast('Failed to export document', { type: 'error' });
-    }
-  }, [activeDocument, showToast]);
-
-  // Get context menu items
-  const getContextMenuItems = useMemo(() => {
-    if (!contextMenu.document) return [];
-
-    return [
-      {
-        id: 'open',
-        label: 'Open',
-        icon: 'ri-file-line',
-        action: () => onSelectDocument && onSelectDocument(contextMenu.document!),
-        shortcut: '↵'
-      },
-      {
-        id: 'rename',
-        label: 'Rename',
-        icon: 'ri-edit-line',
-        action: () => {
-          setNewDocumentTitle(contextMenu.document!.title);
-          setDocumentToRename(contextMenu.document);
+    // Filter and sort documents
+    const filteredDocuments = useMemo(() => {
+        // If we're searching, return search results
+        if (activeTab === SidebarTab.Search && searchQuery) {
+            return searchResults;
         }
-      },
-      {
-        id: 'duplicate',
-        label: 'Duplicate',
-        icon: 'ri-file-copy-line',
-        action: () => {
-          const docToDuplicate = contextMenu.document!;
-          createDocument(
-            docToDuplicate.type,
-            docToDuplicate.language,
-            docToDuplicate.content,
-            `${docToDuplicate.title} (Copy)`
-          );
+
+        let filtered = [...documents];
+
+        // Apply search filter in Files tab
+        if (activeTab === SidebarTab.Files && searchQuery) {
+            filtered = filtered.filter(doc => doc.title.toLowerCase().includes(searchQuery.toLowerCase()) || doc.content.toLowerCase().includes(searchQuery.toLowerCase()) || doc.type.type.toLowerCase().includes(searchQuery.toLowerCase()) || (doc.language && doc.language.toLowerCase().includes(searchQuery.toLowerCase())) || (doc.tags && doc.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))));
         }
-      },
-      {
-        id: 'delete',
-        label: 'Delete',
-        icon: 'ri-delete-bin-line',
-        action: () => handleDeleteDocument(contextMenu.document!),
-        isDestructive: true
-      }
-    ];
-  }, [contextMenu.document, onSelectDocument, createDocument, handleDeleteDocument]);
 
-  // Handle sidebar resizing
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizing) return;
-      const newWidth = e.clientX;
-      if (newWidth >= 200 && newWidth <= 500) {
-        setWidth(newWidth);
-      }
-    };
+        // Apply tag filter
+        if (filterTag) {
+            filtered = filtered.filter(doc => doc.type.type === filterTag || doc.language === filterTag || (doc.tags && doc.tags.includes(filterTag)));
+        }
 
-    const handleMouseUp = () => {
-      setIsResizing(false);
-    };
+        // Apply sorting
+        filtered.sort((a, b) => {
+            switch (sortOption) {
+                case 'name':
+                    return a.title.localeCompare(b.title);
+                case 'type':
+                    return a.type.type.localeCompare(b.type);
+                case 'date':
+                default:
+                    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+            }
+        });
 
-    if (isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    }
+        return filtered;
+    }, [documents, searchQuery, filterTag, sortOption, activeTab, searchResults]);
 
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isResizing]);
+    // Handle document creation
+    const handleNewFile = useCallback((type: string, language?: string) => {
+        createDocument({type: type} as DocumentType, language);
+        setCreateMenuOpen(false);
+    }, [createDocument]);
 
-  // Handle keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl/Cmd + S to save
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    // Handle document deletion
+    const handleDeleteDocument = useCallback((doc: Document) => {
+        setDocumentToDelete(doc);
+    }, []);
+
+    // Handle delete confirmation
+    const handleConfirmDelete = useCallback(() => {
+        if (documentToDelete && documentToDelete.id) {
+            closeDocument(documentToDelete.id);
+            setDocumentToDelete(null);
+        }
+    }, [documentToDelete, closeDocument]);
+
+    // Handle rename confirmation
+    const handleConfirmRename = useCallback(() => {
+        if (documentToRename && documentToRename.id && newDocumentTitle.trim()) {
+            updateDocumentTitle(documentToRename.id, newDocumentTitle);
+            setDocumentToRename(null);
+        }
+    }, [documentToRename, newDocumentTitle, updateDocumentTitle]);
+
+    // Handle context menu
+    const handleContextMenu = useCallback((e: React.MouseEvent, doc: Document) => {
         e.preventDefault();
-        handleManualSave();
-      }
+        setContextMenu({
+            position: {x: e.clientX, y: e.clientY}, document: doc
+        });
+    }, []);
 
-      // Ctrl/Cmd + E to export
-      if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
-        e.preventDefault();
-        handleExport();
-      }
-    };
+    // Close context menu
+    const closeContextMenu = useCallback(() => {
+        setContextMenu({position: null, document: null});
+    }, []);
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [handleManualSave, handleExport]);
-
-  return (
-    <>
-      {/* Confirmation modals */}
-      <ConfirmationModal
-        isOpen={documentToDelete !== null}
-        title="Delete Document"
-        message={`Are you sure you want to delete "${documentToDelete?.title}"? This action cannot be undone.`}
-        confirmLabel="Delete"
-        cancelLabel="Cancel"
-        isDestructive={true}
-        icon="ri-delete-bin-line"
-        onConfirm={handleConfirmDelete}
-        onCancel={() => setDocumentToDelete(null)}
-      />
-
-      <ConfirmationModal
-        isOpen={documentToRename !== null}
-        title="Rename Document"
-        message={
-          <div>
-            <p className="mb-2">Enter a new name for "{documentToRename?.title}"</p>
-            <input
-              type="text"
-              className="w-full p-2 border rounded"
-              style={{
-                backgroundColor: currentTheme.colors.inputBackground,
-                color: currentTheme.colors.inputText,
-                borderColor: currentTheme.colors.border
-              }}
-              value={newDocumentTitle}
-              onChange={(e) => setNewDocumentTitle(e.target.value)}
-              autoFocus
-            />
-          </div>
+    // Handle manual save
+    const handleManualSave = useCallback(async () => {
+        if (activeDocument && activeDocument.id) {
+            try {
+                await saveDocument(activeDocument);
+                showToast('Document saved', {type: 'success'});
+            } catch (error) {
+                showToast('Failed to save document', {type: 'error'});
+            }
         }
-        confirmLabel="Rename"
-        cancelLabel="Cancel"
-        icon="ri-edit-line"
-        onConfirm={handleConfirmRename}
-        onCancel={() => setDocumentToRename(null)}
-      />
+    }, [activeDocument, saveDocument, showToast]);
 
-      {/* Context Menu */}
-      <ContextMenu
-        items={getContextMenuItems}
-        position={contextMenu.position}
-        onClose={closeContextMenu}
-      />
+    // Handle export
+    const handleExport = useCallback(() => {
+        if (!activeDocument) {
+            showToast('No document to export', {type: 'warning'});
+            return;
+        }
 
-      {/* Main sidebar container */}
-      <div
-        ref={sidebarRef}
-        className="sidebar flex flex-col h-full border-r"
-        style={{
-          width: `${width}px`,
-          backgroundColor: currentTheme.colors.sidebar,
-          color: currentTheme.colors.sidebarText,
-          borderColor: currentTheme.colors.border
-        }}
-      >
-        {/* Sidebar header */}
-        <div className="sidebar-header flex items-center justify-between p-2 border-b"
-          style={{ borderColor: currentTheme.colors.border }}
-        >
-          <div className="flex items-center">
-            <IconButton
-              icon="menu-fold-line"
-              onClick={onToggleSidebar}
-              title="Hide Sidebar"
+        const getFileExtension = (type: string): string => {
+            switch (type) {
+                case 'markdown':
+                    return 'md';
+                case 'javascript':
+                    return 'js';
+                case 'python':
+                    return 'py';
+                case 'html':
+                    return 'html';
+                default:
+                    return 'txt';
+            }
+        };
+
+        try {
+            const blob = new Blob([activeDocument.content], {type: 'text/plain'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const fileName = `${activeDocument.title}.${getFileExtension(activeDocument.type.type)}`;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showToast(`Exported "${fileName}" successfully`, {type: 'success'});
+        } catch (error) {
+            console.error('Error exporting document:', error);
+            showToast('Failed to export document', {type: 'error'});
+        }
+    }, [activeDocument, showToast]);
+
+    // Get context menu items
+    const getContextMenuItems = useMemo(() => {
+        if (!contextMenu.document) return [];
+
+        return [{
+            id: 'open',
+            label: 'Open',
+            icon: 'ri-file-line',
+            action: () => onSelectDocument && onSelectDocument(contextMenu.document!),
+            shortcut: '↵'
+        }, {
+            id: 'rename', label: 'Rename', icon: 'ri-edit-line', action: () => {
+                setNewDocumentTitle(contextMenu.document!.title);
+                setDocumentToRename(contextMenu.document);
+            }
+        }, {
+            id: 'duplicate', label: 'Duplicate', icon: 'ri-file-copy-line', action: () => {
+                const docToDuplicate = contextMenu.document!;
+                createDocument(docToDuplicate.type, docToDuplicate.language, docToDuplicate.content, `${docToDuplicate.title} (Copy)`);
+            }
+        }, {
+            id: 'delete',
+            label: 'Delete',
+            icon: 'ri-delete-bin-line',
+            action: () => handleDeleteDocument(contextMenu.document!),
+            isDestructive: true
+        }];
+    }, [contextMenu.document, onSelectDocument, createDocument, handleDeleteDocument]);
+
+    // Handle sidebar resizing
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!isResizing) return;
+            const newWidth = e.clientX;
+            if (newWidth >= 200 && newWidth <= 500) {
+                setWidth(newWidth);
+            }
+        };
+
+        const handleMouseUp = () => {
+            setIsResizing(false);
+        };
+
+        if (isResizing) {
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+        }
+
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isResizing]);
+
+    // Handle keyboard shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Ctrl/Cmd + S to save
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                handleManualSave();
+            }
+
+            // Ctrl/Cmd + E to export
+            if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+                e.preventDefault();
+                handleExport();
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [handleManualSave, handleExport]);
+
+    return (<>
+            {/* Confirmation modals */}
+            <ConfirmationModal
+                isOpen={documentToDelete !== null}
+                title="Delete Document"
+                message={`Are you sure you want to delete "${documentToDelete?.title}"? This action cannot be undone.`}
+                confirmLabel="Delete"
+                cancelLabel="Cancel"
+                isDestructive={true}
+                icon="ri-delete-bin-line"
+                onConfirm={handleConfirmDelete}
+                onCancel={() => setDocumentToDelete(null)}
             />
-            <h2 className="ml-2 font-medium">Documents</h2>
-          </div>
 
-          <div className="flex items-center">
-            <MenuButton
-              icon="add-line"
-              isOpen={createMenuOpen}
-              onClick={() => setCreateMenuOpen(!createMenuOpen)}
-              title="Create New Document"
-            >
-              <DocumentTypeMenu onSelectType={handleNewFile} />
-            </MenuButton>
-
-            <IconButton
-              icon={viewMode === 'list' ? 'list-check' : 'grid-fill'}
-              onClick={() => setViewMode(viewMode === 'list' ? 'grid' : 'list')}
-              title={viewMode === 'list' ? 'Switch to Grid View' : 'Switch to List View'}
+            <ConfirmationModal
+                isOpen={documentToRename !== null}
+                title="Rename Document"
+                message={<div>
+                    <p className="mb-2">Enter a new name for "{documentToRename?.title}"</p>
+                    <input
+                        type="text"
+                        className="w-full p-2 border rounded"
+                        style={{
+                            backgroundColor: currentTheme.colors.inputBackground,
+                            color: currentTheme.colors.inputText,
+                            borderColor: currentTheme.colors.border
+                        }}
+                        value={newDocumentTitle}
+                        onChange={(e) => setNewDocumentTitle(e.target.value)}
+                        autoFocus
+                    />
+                </div>}
+                confirmLabel="Rename"
+                cancelLabel="Cancel"
+                icon="ri-edit-line"
+                onConfirm={handleConfirmRename}
+                onCancel={() => setDocumentToRename(null)}
             />
-          </div>
-        </div>
 
-        {/* Search bar */}
-        <div className="p-2 border-b" style={{ borderColor: currentTheme.colors.border }}>
-          <SearchBar
-            value={searchQuery}
-            onChange={setSearchQuery}
-            placeholder="Search documents..."
-            onClear={() => setSearchQuery('')}
-            isSearching={isSearching}
-          />
-        </div>
+            {/* Context Menu */}
+            <ContextMenu
+                items={getContextMenuItems}
+                position={contextMenu.position}
+                onClose={closeContextMenu}
+            />
 
-        {/* Filters and Sort */}
-        <div className="p-2 border-b space-y-2" style={{ borderColor: currentTheme.colors.border }}>
-          {/* Filter and Sort controls in one row */}
-          <div className="flex items-center justify-between gap-2">
-            {/* Filter dropdown */}
-            <MenuButton
-              icon={filterTag ? "filter-2-fill" : "filter-2-line"}
-              onClick={() => setShowFilterMenu(!showFilterMenu)}
-              title="Filter documents"
-              isOpen={showFilterMenu}
-              dropdownAlign="left"
+            {/* Main sidebar container */}
+            <div
+                ref={sidebarRef}
+                className="sidebar flex flex-col h-full border-r"
+                style={{
+                    width: `${width}px`,
+                    backgroundColor: currentTheme.colors.sidebar,
+                    color: currentTheme.colors.sidebarText,
+                    borderColor: currentTheme.colors.border
+                }}
             >
-              <div className="p-2">
-                <div className="text-xs font-medium mb-2 opacity-70">Filter by type/tag</div>
-                <div className="space-y-1 max-h-48 overflow-y-auto">
-                  <button
-                    className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-opacity-10 hover:bg-gray-500 ${!filterTag ? 'font-medium' : ''}`}
-                    style={{
-                      backgroundColor: !filterTag ? currentTheme.colors.buttonActiveBackground : 'transparent',
-                    }}
-                    onClick={() => {
-                      setFilterTag(null);
-                      setShowFilterMenu(false);
-                    }}
-                  >
-                    All documents
-                  </button>
-                  {tags.map(tag => (
-                    <button
-                      key={tag}
-                      className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-opacity-10 hover:bg-gray-500 ${filterTag === tag ? 'font-medium' : ''}`}
-                      style={{
-                        backgroundColor: filterTag === tag ? currentTheme.colors.buttonActiveBackground : 'transparent',
-                      }}
-                      onClick={() => {
-                        setFilterTag(tag);
-                        setShowFilterMenu(false);
-                      }}
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </MenuButton>
+                {/* Sidebar header */}
+                <div className="sidebar-header flex items-center justify-between p-2 border-b"
+                     style={{borderColor: currentTheme.colors.border}}
+                >
+                    <div className="flex items-center">
+                        <IconButton
+                            icon="menu-fold-line"
+                            onClick={onToggleSidebar}
+                            title="Hide Sidebar"
+                        />
+                        <h2 className="ml-2 font-medium">Documents</h2>
+                    </div>
 
-            {/* Sort dropdown */}
-            <MenuButton
-              icon="sort-desc"
-              onClick={() => setShowSortMenu(!showSortMenu)}
-              title="Sort documents"
-              isOpen={showSortMenu}
-              dropdownAlign="right"
-            >
-              <div className="p-2">
-                <div className="text-xs font-medium mb-2 opacity-70">Sort by</div>
-                <div className="space-y-1">
-                  {(['date', 'name', 'type'] as const).map(option => (
-                    <button
-                      key={option}
-                      className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-opacity-10 hover:bg-gray-500 ${sortOption === option ? 'font-medium' : ''}`}
-                      style={{
-                        backgroundColor: sortOption === option ? currentTheme.colors.buttonActiveBackground : 'transparent',
-                      }}
-                      onClick={() => {
-                        setSortOption(option);
-                        setShowSortMenu(false);
-                      }}
-                    >
-                      <i className={`ri-${option === 'date' ? 'time' : option === 'name' ? 'file-text' : 'folder-2'}-line mr-2`}></i>
-                      {option === 'date' ? 'Last modified' : option === 'name' ? 'Name' : 'Type'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </MenuButton>
-          </div>
+                    <div className="flex items-center">
+                        <MenuButton
+                            icon="add-line"
+                            isOpen={createMenuOpen}
+                            onClick={() => setCreateMenuOpen(!createMenuOpen)}
+                            title="Create New Document"
+                        >
+                            <DocumentTypeMenu onSelectType={handleNewFile}/>
+                        </MenuButton>
 
-          {/* Active filter indicator */}
-          {filterTag && (
-            <div className="flex items-center text-xs">
-              <span className="opacity-70">Filtered by:</span>
-              <span className="ml-1 px-2 py-0.5 rounded" style={{ backgroundColor: currentTheme.colors.buttonActiveBackground }}>
+                        <IconButton
+                            icon={viewMode === 'list' ? 'list-check' : 'grid-fill'}
+                            onClick={() => setViewMode(viewMode === 'list' ? 'grid' : 'list')}
+                            title={viewMode === 'list' ? 'Switch to Grid View' : 'Switch to List View'}
+                        />
+                    </div>
+                </div>
+
+                {/* Search bar */}
+                <div className="p-2 border-b" style={{borderColor: currentTheme.colors.border}}>
+                    <SearchBar
+                        value={searchQuery}
+                        onChange={setSearchQuery}
+                        placeholder="Search documents..."
+                        onClear={() => setSearchQuery('')}
+                        isSearching={isSearching}
+                    />
+                </div>
+
+                {/* Filters and Sort */}
+                <div className="p-2 border-b space-y-2" style={{borderColor: currentTheme.colors.border}}>
+                    {/* Filter and Sort controls in one row */}
+                    <div className="flex items-center justify-between gap-2">
+                        {/* Filter dropdown */}
+                        <MenuButton
+                            icon={filterTag ? "filter-2-fill" : "filter-2-line"}
+                            onClick={() => setShowFilterMenu(!showFilterMenu)}
+                            title="Filter documents"
+                            isOpen={showFilterMenu}
+                            dropdownAlign="left"
+                        >
+                            <div className="p-2">
+                                <div className="text-xs font-medium mb-2 opacity-70">Filter by type/tag</div>
+                                <div className="space-y-1 max-h-48 overflow-y-auto">
+                                    <button
+                                        className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-opacity-10 hover:bg-gray-500 ${!filterTag ? 'font-medium' : ''}`}
+                                        style={{
+                                            backgroundColor: !filterTag ? currentTheme.colors.buttonActiveBackground : 'transparent',
+                                        }}
+                                        onClick={() => {
+                                            setFilterTag(null);
+                                            setShowFilterMenu(false);
+                                        }}
+                                    >
+                                        All documents
+                                    </button>
+                                    {tags.map(tag => (<button
+                                            key={tag}
+                                            className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-opacity-10 hover:bg-gray-500 ${filterTag === tag ? 'font-medium' : ''}`}
+                                            style={{
+                                                backgroundColor: filterTag === tag ? currentTheme.colors.buttonActiveBackground : 'transparent',
+                                            }}
+                                            onClick={() => {
+                                                setFilterTag(tag);
+                                                setShowFilterMenu(false);
+                                            }}
+                                        >
+                                            {tag}
+                                        </button>))}
+                                </div>
+                            </div>
+                        </MenuButton>
+
+                        {/* Sort dropdown */}
+                        <MenuButton
+                            icon="sort-desc"
+                            onClick={() => setShowSortMenu(!showSortMenu)}
+                            title="Sort documents"
+                            isOpen={showSortMenu}
+                            dropdownAlign="right"
+                        >
+                            <div className="p-2">
+                                <div className="text-xs font-medium mb-2 opacity-70">Sort by</div>
+                                <div className="space-y-1">
+                                    {(['date', 'name', 'type'] as const).map(option => (<button
+                                            key={option}
+                                            className={`w-full text-left px-2 py-1.5 text-sm rounded hover:bg-opacity-10 hover:bg-gray-500 ${sortOption === option ? 'font-medium' : ''}`}
+                                            style={{
+                                                backgroundColor: sortOption === option ? currentTheme.colors.buttonActiveBackground : 'transparent',
+                                            }}
+                                            onClick={() => {
+                                                setSortOption(option);
+                                                setShowSortMenu(false);
+                                            }}
+                                        >
+                                            <i className={`ri-${option === 'date' ? 'time' : option === 'name' ? 'file-text' : 'folder-2'}-line mr-2`}></i>
+                                            {option === 'date' ? 'Last modified' : option === 'name' ? 'Name' : 'Type'}
+                                        </button>))}
+                                </div>
+                            </div>
+                        </MenuButton>
+                    </div>
+
+                    {/* Active filter indicator */}
+                    {filterTag && (<div className="flex items-center text-xs">
+                            <span className="opacity-70">Filtered by:</span>
+                            <span className="ml-1 px-2 py-0.5 rounded"
+                                  style={{backgroundColor: currentTheme.colors.buttonActiveBackground}}>
                 {filterTag}
               </span>
-              <button
-                className="ml-2 opacity-70 hover:opacity-100"
-                onClick={() => setFilterTag(null)}
-              >
-                <i className="ri-close-line"></i>
-              </button>
-            </div>
-          )}
-        </div>
+                            <button
+                                className="ml-2 opacity-70 hover:opacity-100"
+                                onClick={() => setFilterTag(null)}
+                            >
+                                <i className="ri-close-line"></i>
+                            </button>
+                        </div>)}
+                </div>
 
-        {/* Document list */}
-        <div className="flex-1 overflow-y-auto p-2">
-          {filteredDocuments.length === 0 ? (
-            <div className="text-center py-8 opacity-70">
-              <i className="ri-file-search-line text-3xl mb-2"></i>
-              <p>{searchQuery ? 'No documents found' : 'No documents yet'}</p>
-              {searchQuery && (
-                <button
-                  className="mt-2 px-3 py-1 rounded text-sm"
-                  style={{
-                    backgroundColor: currentTheme.colors.buttonBackground,
-                    color: currentTheme.colors.buttonText
-                  }}
-                  onClick={() => setSearchQuery('')}
-                >
-                  Clear search
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className={viewMode === 'grid' ? 'grid grid-cols-2 gap-2' : 'space-y-1'}>
-              {filteredDocuments.map(doc => (
-                <DocumentItem
-                  key={doc.id}
-                  document={doc}
-                  isActive={activeDocument?.id === doc.id}
-                  onClick={() => onSelectDocument && onSelectDocument(doc)}
-                  onContextMenu={(e) => handleContextMenu(e, doc)}
-                  viewMode={viewMode}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+                {/* Document list */}
+                <div className="flex-1 overflow-y-auto p-2">
+                    {filteredDocuments.length === 0 ? (<div className="text-center py-8 opacity-70">
+                            <i className="ri-file-search-line text-3xl mb-2"></i>
+                            <p>{searchQuery ? 'No documents found' : 'No documents yet'}</p>
+                            {searchQuery && (<button
+                                    className="mt-2 px-3 py-1 rounded text-sm"
+                                    style={{
+                                        backgroundColor: currentTheme.colors.buttonBackground,
+                                        color: currentTheme.colors.buttonText
+                                    }}
+                                    onClick={() => setSearchQuery('')}
+                                >
+                                    Clear search
+                                </button>)}
+                        </div>) : (<div className={viewMode === 'grid' ? 'grid grid-cols-2 gap-2' : 'space-y-1'}>
+                            {filteredDocuments.map(doc => (<DocumentItem
+                                    key={doc.id}
+                                    document={doc}
+                                    isActive={activeDocument?.id === doc.id}
+                                    onClick={() => onSelectDocument && onSelectDocument(doc)}
+                                    onContextMenu={(e) => handleContextMenu(e, doc)}
+                                    viewMode={viewMode}
+                                />))}
+                        </div>)}
+                </div>
 
-        {/* Sidebar footer with actions and info */}
-        <div className="border-t p-2 flex flex-col gap-2" style={{ borderColor: currentTheme.colors.border }}>
-          {/* Document actions */}
-          {activeDocument && (
-            <div className="flex items-center gap-1">
-              {/* Save button (only show if manual save is needed) */}
-              {!settings.editor.autoSave && documentStates[parseInt(activeDocument.id)]?.isDirty && (
-                <IconButton
-                  icon="save-line"
-                  onClick={handleManualSave}
-                  title="Save (Ctrl/Cmd+S)"
-                  className="text-yellow-600"
-                />
-              )}
-              
-              {/* Export button */}
-              <IconButton
-                icon="download-line"
-                onClick={handleExport}
-                title="Export (Ctrl/Cmd+E)"
-              />
-              
-              <div className="flex-1" />
-              
-              {/* Document status */}
-              <span className="text-xs opacity-50">
-                {documentStates[parseInt(activeDocument.id)]?.isSaving && (
-                  <span className="mr-2">
+                {/* Sidebar footer with actions and info */}
+                <div className="border-t p-2 flex flex-col gap-2" style={{borderColor: currentTheme.colors.border}}>
+                    {/* Document actions */}
+                    {activeDocument && (<div className="flex items-center gap-1">
+                            {/* Save button (only show if manual save is needed) */}
+                            {!settings.editor.autoSave && documentStates[parseInt(activeDocument.id)]?.isDirty && (
+                                <IconButton
+                                    icon="save-line"
+                                    onClick={handleManualSave}
+                                    title="Save (Ctrl/Cmd+S)"
+                                    className="text-yellow-600"
+                                />)}
+
+                            {/* Export button */}
+                            <IconButton
+                                icon="download-line"
+                                onClick={handleExport}
+                                title="Export (Ctrl/Cmd+E)"
+                            />
+
+                            <div className="flex-1"/>
+
+                            {/* Document status */}
+                            <span className="text-xs opacity-50">
+                {documentStates[parseInt(activeDocument.id)]?.isSaving && (<span className="mr-2">
                     <i className="ri-loader-4-line animate-spin"></i> Saving...
-                  </span>
-                )}
-                {documentStates[parseInt(activeDocument.id)]?.isDirty && !settings.editor.autoSave && (
-                  <span className="text-yellow-600">Unsaved</span>
-                )}
+                  </span>)}
+                                {documentStates[parseInt(activeDocument.id)]?.isDirty && !settings.editor.autoSave && (
+                                    <span className="text-yellow-600">Unsaved</span>)}
               </span>
-            </div>
-          )}
-          
-          {/* Bottom row with theme toggle and help */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-1">
-              {/* Theme toggle */}
-              <IconButton
-                icon={currentTheme.isDark ? 'sun-line' : 'moon-line'}
-                onClick={toggleTheme}
-                title="Toggle Light/Dark Theme"
-              />
-              
-              {/* Help menu */}
-              <MenuButton
-                icon="question-line"
-                isOpen={showHelpMenu}
-                onClick={() => setShowHelpMenu(!showHelpMenu)}
-                title="Help & Keyboard Shortcuts"
-              >
-                <HelpMenu getShortcutKey={getShortcutKey} />
-              </MenuButton>
-            </div>
-            
-            <div className="text-xs opacity-50">
-              {documents.length} documents
-            </div>
-          </div>
-        </div>
+                        </div>)}
 
-        {/* Resize handle */}
-        <div
-          ref={resizeRef}
-          className="absolute top-0 right-0 w-1 h-full cursor-ew-resize hover:bg-opacity-50 hover:bg-gray-500"
-          onMouseDown={() => setIsResizing(true)}
-        />
-      </div>
-    </>
-  );
+                    {/* Bottom row with theme toggle and help */}
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-1">
+                            {/* Theme toggle */}
+                            <IconButton
+                                icon={currentTheme.isDark ? 'sun-line' : 'moon-line'}
+                                onClick={toggleTheme}
+                                title="Toggle Light/Dark Theme"
+                            />
+
+                            {/* Help menu */}
+                            <MenuButton
+                                icon="question-line"
+                                isOpen={showHelpMenu}
+                                onClick={() => setShowHelpMenu(!showHelpMenu)}
+                                title="Help & Keyboard Shortcuts"
+                            >
+                                <HelpMenu getShortcutKey={getShortcutKey}/>
+                            </MenuButton>
+                        </div>
+
+                        <div className="text-xs opacity-50">
+                            {documents.length} documents
+                        </div>
+                    </div>
+                </div>
+
+                {/* Resize handle */}
+                <div
+                    ref={resizeRef}
+                    className="absolute top-0 right-0 w-1 h-full cursor-ew-resize hover:bg-opacity-50 hover:bg-gray-500"
+                    onMouseDown={() => setIsResizing(true)}
+                />
+            </div>
+        </>);
 };
 
 export default Sidebar;

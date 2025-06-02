@@ -13,7 +13,6 @@ interface DocumentEditorPanelProps {
 const DocumentEditorPanel: React.FC<IDockviewPanelProps<DocumentEditorPanelProps>> = (props) => {
     const { params } = props;
     const { document, onUpdate } = params;
-    const [isEditing, setIsEditing] = useState(true);
     const { settings, currentTheme } = useSettings();
 
     // Create a local copy of the document to prevent issues during saving
