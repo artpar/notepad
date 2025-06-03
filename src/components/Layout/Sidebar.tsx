@@ -14,6 +14,7 @@ import 'remixicon/fonts/remixicon.css';
 import {useDocuments} from "../../contexts/DocumentProvider.tsx";
 import {DocumentType} from "../../types/DocumentType.tsx";
 import {useToast} from '../UI/ToastSystem';
+import * as StorageService from '../../services/storage';
 
 interface SidebarProps {
     onToggleSidebar: () => void;
@@ -26,10 +27,9 @@ const Sidebar: React.FC<SidebarProps> = ({onToggleSidebar, onSelectDocument}) =>
         documents,
         activeDocument,
         createDocument,
-        closeDocument,
+        deleteDocument,
         updateDocumentTitle,
         searchDocuments,
-        saveDocument,
         documentStates
     } = useDocuments();
     const {getShortcutKey} = useKeyboardShortcuts();
@@ -123,10 +123,16 @@ const Sidebar: React.FC<SidebarProps> = ({onToggleSidebar, onSelectDocument}) =>
     // Handle delete confirmation
     const handleConfirmDelete = useCallback(() => {
         if (documentToDelete && documentToDelete.id) {
-            closeDocument(documentToDelete.id);
+            const docId = parseInt(documentToDelete.id);
+            deleteDocument(docId).then(() => {
+                showToast(`Deleted "${documentToDelete.title}"`, { type: 'success' });
+            }).catch((error) => {
+                console.error('Failed to delete document:', error);
+                showToast('Failed to delete document', { type: 'error' });
+            });
             setDocumentToDelete(null);
         }
-    }, [documentToDelete, closeDocument]);
+    }, [documentToDelete, deleteDocument, showToast]);
 
     // Handle rename confirmation
     const handleConfirmRename = useCallback(() => {
@@ -153,13 +159,13 @@ const Sidebar: React.FC<SidebarProps> = ({onToggleSidebar, onSelectDocument}) =>
     const handleManualSave = useCallback(async () => {
         if (activeDocument && activeDocument.id) {
             try {
-                await saveDocument(activeDocument);
+                await StorageService.saveDocument(activeDocument);
                 showToast('Document saved', {type: 'success'});
             } catch (error) {
                 showToast('Failed to save document', {type: 'error'});
             }
         }
-    }, [activeDocument, saveDocument, showToast]);
+    }, [activeDocument, showToast]);
 
     // Handle export
     const handleExport = useCallback(() => {

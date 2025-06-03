@@ -19,6 +19,7 @@ interface DocumentContextType {
   createDocument: (type: DocumentType, language?: string, content?: string, title?: string) => Promise<number>;
   openDocument: (id: number) => Promise<void>;
   closeDocument: (id: number) => Promise<void>;
+  deleteDocument: (id: number) => Promise<void>;
   updateDocumentTitle: (id: number, title: string) => Promise<void>;
   updateDocumentTags: (id: number, tags: string[]) => Promise<void>;
   switchTab: (tabId: string) => void;
@@ -354,6 +355,25 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [openTabs, activeTabId, switchTab]);
 
+  // Delete document
+  const deleteDocument = useCallback(async (id: number): Promise<void> => {
+    // First close any open tabs for this document
+    await closeDocument(id);
+    
+    // Remove from storage
+    await StorageService.deleteDocument(id);
+    
+    // Remove from state
+    setDocuments(prev => prev.filter(doc => doc.id !== String(id)));
+    
+    // Clean up document state
+    setDocumentStates(prev => {
+      const newStates = { ...prev };
+      delete newStates[id];
+      return newStates;
+    });
+  }, [closeDocument]);
+
   // Search documents
   const searchDocuments = useCallback(async (query: string): Promise<Document[]> => {
     if (!query.trim()) return [];
@@ -378,6 +398,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     createDocument,
     openDocument,
     closeDocument,
+    deleteDocument,
     updateDocumentTitle,
     updateDocumentTags,
     switchTab,

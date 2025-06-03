@@ -129,13 +129,6 @@ function AppContent() {
         }
     }, [dockviewApi, openContextDocument, updateDocument]);
 
-    // Delete document with confirmation
-    const deleteDocument = useCallback((id: number) => {
-        const doc = documents.find(d => d.id && parseInt(d.id) === id);
-        if (doc) {
-            setDocumentToDelete(doc);
-        }
-    }, [documents]);
 
     // Handle delete confirmation
     const handleConfirmDelete = useCallback(() => {
