@@ -308,6 +308,12 @@ const Sidebar: React.FC<SidebarProps> = ({onToggleSidebar, onSelectDocument}) =>
                         }}
                         value={newDocumentTitle}
                         onChange={(e) => setNewDocumentTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleConfirmRename();
+                            }
+                        }}
                         autoFocus
                     />
                 </div>}

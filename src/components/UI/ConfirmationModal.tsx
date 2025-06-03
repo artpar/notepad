@@ -29,12 +29,25 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                                                              }) => {
     const {currentTheme} = useSettings();
     const confirmButtonRef = useRef<HTMLButtonElement>(null);
+    const modalRef = useRef<HTMLDivElement>(null);
 
-    // Focus the appropriate button when the modal opens
+    // Focus the appropriate element when the modal opens
     useEffect(() => {
-        if (isOpen && confirmButtonRef.current) {
+        if (isOpen) {
             setTimeout(() => {
-                confirmButtonRef.current?.focus();
+                // Check if there's an input field in the modal
+                const inputElement = modalRef.current?.querySelector('input, textarea');
+                if (inputElement) {
+                    // If there's an input field, focus it instead of the confirm button
+                    (inputElement as HTMLElement).focus();
+                    // Select all text in the input field
+                    if (inputElement instanceof HTMLInputElement || inputElement instanceof HTMLTextAreaElement) {
+                        inputElement.select();
+                    }
+                } else {
+                    // Otherwise, focus the confirm button
+                    confirmButtonRef.current?.focus();
+                }
             }, 100);
         }
     }, [isOpen]);
@@ -66,6 +79,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         {/* Modal */}
         <div className="flex items-center justify-center min-h-screen p-4">
             <div
+                ref={modalRef}
                 className="relative rounded-lg shadow-xl max-w-md w-full p-6 overflow-hidden"
                 style={{
                     backgroundColor: currentTheme.colors.background,
@@ -90,14 +104,14 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                         >
                             {title}
                         </h3>
-                        <p
+                        <div
                             className="text-sm"
                             style={{
                                 color: currentTheme.isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.8)'
                             }}
                         >
                             {message}
-                        </p>
+                        </div>
                     </div>
                 </div>
 
