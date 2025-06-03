@@ -4,7 +4,7 @@ import CodeEditor from './CodeEditor';
 import MarkdownEditor from './MarkdownEditor';
 import RichTextEditor from './RichTextEditor';
 import { useAutoSave } from '../../hooks/useAutoSave';
-import { useDocuments } from '../../contexts/DocumentProviderV2';
+import { useDocuments } from '../../contexts/DocumentProvider.tsx';
 import { useToast } from '../UI/ToastSystem';
 import { useSettings } from '../../contexts/SettingsContext';
 
@@ -75,7 +75,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, readOnly = fa
     }
 
     const content = document.content || '';
-    
+
     switch (docType) {
       case 'markdown':
         return (

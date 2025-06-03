@@ -11,7 +11,7 @@ import DocumentTypeMenu from '../UI/DocumentTypeMenu';
 import HelpMenu from '../UI/HelpMenu';
 import useKeyboardShortcuts from '../../hooks/useKeyboardShortcuts';
 import 'remixicon/fonts/remixicon.css';
-import {useDocuments} from "../../contexts/DocumentProviderV2.tsx";
+import {useDocuments} from "../../contexts/DocumentProvider.tsx";
 import {DocumentType} from "../../types/DocumentType.tsx";
 import {useToast} from '../UI/ToastSystem';
 

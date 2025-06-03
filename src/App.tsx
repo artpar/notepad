@@ -26,7 +26,7 @@ import * as LayoutService from './services/layoutService';
 import ToastProvider, {useToast} from "./components/UI/ToastSystem.tsx";
 import DocumentSearch from "./components/Search/DocumentSearch.tsx";
 import Welcome from "./components/UI/Welcome.tsx";
-import {useDocuments} from "./contexts/DocumentProviderV2.tsx";
+import {useDocuments} from "./contexts/DocumentProvider.tsx";
 import {DocumentType} from "./types/DocumentType.tsx";
 
 // App component wrapper with Toast provider
@@ -366,7 +366,7 @@ function AppContent() {
             try {
                 const panelKeys = Object.keys(savedLayout.panels);
                 const panelsToRemove: string[] = [];
-                
+
                 for (const panelKey of panelKeys) {
                     const panelObject = savedLayout.panels[panelKey];
                     if (!panelObject.params) {
@@ -398,12 +398,12 @@ function AppContent() {
                         }
                     }
                 }
-                
+
                 // Remove panels for missing documents
                 for (const panelKey of panelsToRemove) {
                     delete savedLayout.panels[panelKey];
                 }
-                
+
                 // Only restore layout if there are still panels left
                 if (Object.keys(savedLayout.panels).length > 0) {
                     event.api.fromJSON(savedLayout);
