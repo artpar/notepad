@@ -78,7 +78,8 @@ export const saveDocument = async (document: Document): Promise<number> => {
   } else {
     // Remove id field for new documents to let Dexie auto-generate it
     const { id, ...documentWithoutId } = safeDocument;
-    return await db.documents.add(documentWithoutId);
+    const newId = await db.documents.add(documentWithoutId);
+    return newId;
   }
 };
 

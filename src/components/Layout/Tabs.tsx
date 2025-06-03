@@ -2,6 +2,7 @@
 import React from 'react';
 import { useSettings } from '../../contexts/SettingsContext';
 import { TabInfo } from '../../types/ui';
+import { useDocuments } from '../../contexts/UseDocuments';
 
 interface TabsProps {
   tabs: TabInfo[];
@@ -17,6 +18,7 @@ const Tabs: React.FC<TabsProps> = ({
   onTabClose 
 }) => {
   const { currentTheme } = useSettings();
+  const { documentStates } = useDocuments();
 
   return (
     <div 
@@ -41,9 +43,14 @@ const Tabs: React.FC<TabsProps> = ({
           }}
           onClick={() => onTabClick(tab.id)}
         >
-          <span className="mr-2 truncate max-w-xs">
+          <span className="mr-2 truncate max-w-xs flex items-center">
             {tab.title}
-            {tab.isDirty && '*'}
+            {tab.isDirty && !documentStates[tab.documentId!]?.isSaving && (
+              <span className="ml-1 text-orange-500">•</span>
+            )}
+            {documentStates[tab.documentId!]?.isSaving && (
+              <span className="ml-1 text-blue-500 animate-pulse">⟳</span>
+            )}
           </span>
           <button
             className="ml-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"

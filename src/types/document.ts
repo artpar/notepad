@@ -94,6 +94,7 @@ export interface DocumentState {
     isDirty: boolean;
     isSaving: boolean;
     lastSaved?: Date;
+    lastModified?: Date;
 }
 
 

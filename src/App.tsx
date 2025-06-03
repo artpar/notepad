@@ -11,13 +11,14 @@ import {AnimatePresence, motion} from 'framer-motion';
 
 // Import components
 import Sidebar from './components/Layout/Sidebar';
-import DocumentEditorPanel from './components/Editor/DocumentEditorPanel';
+import SimpleDocumentEditorPanel from './components/Editor/SimpleDocumentEditorPanel';
 import DocumentPreviewPanel from './components/Preview/DocumentPreviewPanel';
 import ExplorerPanel from './components/Explorer/ExplorerPanel';
 import PropertiesPanel from './components/Properties/PropertiesPanel';
 import {CustomGroupPanel, CustomWatermarkPanel} from './components/Panels/CustomPanels';
 import ConfirmationModal from './components/UI/ConfirmationModal';
 import ContextMenu, {ContextMenuItem} from './components/UI/ContextMenu';
+import SimpleSaveStatusIndicator from './components/UI/SimpleSaveStatusIndicator';
 
 // Import services and utils
 import * as StorageService from './services/storage';
@@ -93,9 +94,10 @@ function AppContent() {
                 const newDoc = documents.find(doc => doc.id && parseInt(doc.id) === id);
                 if (newDoc) {
                     dockviewApi.addPanel({
-                        id: `editor-${id}`, component: 'documentEditor', params: {
-                            document: newDoc, onUpdate: (content: string) => updateDocument(id, content)
-                        }, title: newDoc.title
+                        id: `editor-${id}`, 
+                        component: 'documentEditor', 
+                        params: { document: newDoc, documentId: id }, 
+                        title: newDoc.title
                     });
                     saveLayoutRef.current();
 
@@ -122,9 +124,10 @@ function AppContent() {
             } else {
                 // Open new editor panel
                 dockviewApi.addPanel({
-                    id: `editor-${doc.id}`, component: 'documentEditor', params: {
-                        document: doc, onUpdate: (content: string) => updateDocument(parseInt(doc.id), content)
-                    }, title: doc.title
+                    id: `editor-${doc.id}`, 
+                    component: 'documentEditor', 
+                    params: { document: doc, documentId: parseInt(doc.id) }, 
+                    title: doc.title
                 });
             }
         }
@@ -132,7 +135,7 @@ function AppContent() {
 
     // Delete document with confirmation
     const deleteDocument = useCallback((id: number) => {
-        const doc = documents.find(d => parseInt(d.id) === id);
+        const doc = documents.find(d => d.id && parseInt(d.id) === id);
         if (doc) {
             setDocumentToDelete(doc);
         }
@@ -346,11 +349,10 @@ function AppContent() {
         // If we have an active document, open it
         if (activeDocument) {
             api.addPanel({
-                id: `editor-${activeDocument.id}`, component: 'documentEditor', params: {
-                    document: activeDocument, onUpdate: (content: string) => {
-                        updateDocument(parseInt(activeDocument.id), content);
-                    }
-                }, title: activeDocument.title
+                id: `editor-${activeDocument.id}`, 
+                component: 'documentEditor', 
+                params: { document: activeDocument, documentId: parseInt(activeDocument.id) }, 
+                title: activeDocument.title
             });
         }
     }, [activeDocument, documents, openDocument, createDocument, deleteDocument, updateDocument]);
@@ -377,12 +379,12 @@ function AppContent() {
                         if (doc) {
                             // Add the document to the panel params
                             panelObject.params.document = doc;
+                            panelObject.params.documentId = typeof docId === 'string' ? parseInt(docId, 10) : docId;
                             
-                            // Set up the update function only for editor panels
+                            // Open the document in context to set it as active
                             if (panelObject.component === 'documentEditor') {
-                                panelObject.params.onUpdate = (content: string) => {
-                                    updateDocument(docId, content);
-                                };
+                                const numericId = typeof docId === 'string' ? parseInt(docId, 10) : docId;
+                                openContextDocument(numericId);
                             }
                         } else {
                             console.warn(`Document with ID ${docId} not found in database`);
@@ -392,6 +394,25 @@ function AppContent() {
                     }
                 }
                 event.api.fromJSON(savedLayout);
+                
+                // After restoring layout, find the first editor panel and make its document active
+                setTimeout(() => {
+                    const groups = event.api.groups;
+                    for (const group of groups) {
+                        for (const panel of group.panels) {
+                            if (panel.id.startsWith('editor-')) {
+                                const docId = panel.id.replace('editor-', '');
+                                const numericId = parseInt(docId, 10);
+                                if (!isNaN(numericId)) {
+                                    console.log(`[App] Setting active document from restored layout: ${numericId}`);
+                                    openContextDocument(numericId);
+                                    panel.focus();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }, 100);
             } catch (e) {
                 console.error('Error restoring layout:', e);
                 initializeDefaultLayout(event.api);
@@ -407,14 +428,26 @@ function AppContent() {
                 console.error('Error auto-saving layout on change:', error);
             });
         });
+        
+        // Track active panel changes
+        event.api.onDidActivePanelChange((panel) => {
+            if (panel && panel.id.startsWith('editor-')) {
+                const docId = panel.id.replace('editor-', '');
+                const numericId = parseInt(docId, 10);
+                if (!isNaN(numericId)) {
+                    console.log(`[App] Active panel changed, setting document: ${numericId}`);
+                    openContextDocument(numericId);
+                }
+            }
+        });
 
         // Set loading to false once everything is initialized
         setIsLoading(false);
-    }, [savedLayout, updateDocument, initializeDefaultLayout]);
+    }, [savedLayout, updateDocument, initializeDefaultLayout, openContextDocument]);
 
     // Components for the dockview
     const components = useMemo<PanelCollection>(() => ({
-        documentEditor: DocumentEditorPanel,
+        documentEditor: SimpleDocumentEditorPanel,
         documentPreview: DocumentPreviewPanel,
         explorer: ExplorerPanel,
         properties: PropertiesPanel
@@ -435,7 +468,7 @@ function AppContent() {
 
                     // Save each dirty document
                     const savePromises = dirtyDocIds.map(id => {
-                        const doc = documents.find(d => parseInt(d.id) === id);
+                        const doc = documents.find(d => d.id && parseInt(d.id) === id);
                         if (doc) {
                             return saveDocument(doc);
                         }
@@ -530,6 +563,7 @@ function AppContent() {
                 backgroundColor: currentTheme.colors.background, color: currentTheme.colors.foreground
             }}
         >
+            
             {/* Confirmation Modal for deletion */}
             <ConfirmationModal
                 isOpen={documentToDelete !== null}
@@ -625,23 +659,16 @@ function AppContent() {
                     }}
             >
                 <div className="flex space-x-4">
-                    {activeDocument && (<>
-                            <span className="flex items-center">
-                                <i className="ri-file-type-line mr-1"></i>
-                                {activeDocument.type.type.toUpperCase()}
-                                {activeDocument.language && ` - ${activeDocument.language}`}
-                            </span>
-                            <span className="flex items-center">
-                                <i className="ri-time-line mr-1"></i>
-                                Last modified: {new Date(activeDocument.updatedAt).toLocaleString()}
-                            </span>
-                        </>)}
+                    {activeDocument && (
+                        <span className="flex items-center">
+                            <i className="ri-file-type-line mr-1"></i>
+                            {activeDocument.type.type.toUpperCase()}
+                            {activeDocument.language && ` - ${activeDocument.language}`}
+                        </span>
+                    )}
                 </div>
-                <div className="flex items-center">
-                    <span className="flex items-center text-green-500 dark:text-green-400">
-                        <i className="ri-save-line mr-1"></i>
-                        Autosaved
-                    </span>
+                <div className="text-gray-500">
+                    Offline Mode
                 </div>
             </footer>
         </div>);

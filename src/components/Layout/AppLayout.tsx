@@ -17,7 +17,8 @@ const AppLayout: React.FC = () => {
     activeTabId,
     updateDocument,
     switchTab,
-    closeTab
+    closeTab,
+    documentStates
   } = useDocuments();
 
   const renderActiveContent = () => {
@@ -63,14 +64,20 @@ const AppLayout: React.FC = () => {
             <CodeEditor
               content={activeDocument.content}
               language={activeDocument.language || 'javascript'}
-              onChange={(content) => updateDocument(activeDocument.id!, content)}
+              onChange={(content) => {
+                const docId = parseInt(activeDocument.id!);
+                updateDocument(docId, content);
+              }}
             />
           );
         case 'markdown':
           return (
             <MarkdownEditor
               content={activeDocument.content}
-              onChange={(content) => updateDocument(activeDocument.id!, content)}
+              onChange={(content) => {
+                const docId = parseInt(activeDocument.id!);
+                updateDocument(docId, content);
+              }}
             />
           );
         case 'text':
@@ -78,7 +85,10 @@ const AppLayout: React.FC = () => {
             <CodeEditor
               content={activeDocument.content}
               language="plaintext"
-              onChange={(content) => updateDocument(activeDocument.id!, content)}
+              onChange={(content) => {
+                const docId = parseInt(activeDocument.id!);
+                updateDocument(docId, content);
+              }}
             />
           );
         default:
@@ -125,9 +135,18 @@ const AppLayout: React.FC = () => {
                   {activeDocument.type.toUpperCase()}
                   {activeDocument.language && ` - ${activeDocument.language}`}
                 </span>
-                <span>
-                  Last modified: {new Date(activeDocument.updatedAt).toLocaleString()}
-                </span>
+                {documentStates[parseInt(activeDocument.id!)]?.isSaving && (
+                  <span className="text-blue-500">Saving...</span>
+                )}
+                {documentStates[parseInt(activeDocument.id!)]?.lastSaved && (
+                  <span className="text-green-500">
+                    Saved {new Date(documentStates[parseInt(activeDocument.id!)].lastSaved!).toLocaleTimeString()}
+                  </span>
+                )}
+                {!documentStates[parseInt(activeDocument.id!)]?.isSaving && 
+                 documentStates[parseInt(activeDocument.id!)]?.isDirty && (
+                  <span className="text-orange-500">Unsaved changes</span>
+                )}
               </>
             )}
           </div>

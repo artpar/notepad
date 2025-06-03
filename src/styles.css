@@ -3,6 +3,33 @@
 /* Import Tailwind CSS directives */
 @import "tailwindcss";
 
+/* Save progress animations */
+@keyframes save-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes save-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+.save-progress-bar {
+  animation: save-pulse 2s ease-in-out infinite;
+}
+
+.save-progress-slide {
+  animation: save-slide 1.5s ease-in-out infinite;
+}
+
 
 /* General Styles */
 html, body, #root {
