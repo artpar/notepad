@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect, useCallback } from 'react';
 import { Document, DocumentState } from '../types/document';
 import { TabInfo } from '../types/ui';
 import * as StorageService from '../services/storage';
+import * as TabStateService from '../services/tabStateService';
 import { DocumentType } from '../types/DocumentType';
 import { CodeLanguage } from '../types/document';
 
@@ -45,6 +46,44 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       try {
         const docs = await StorageService.getAllDocuments();
         setDocuments(docs);
+        
+        // Load saved tab state
+        const savedTabState = TabStateService.loadTabState();
+        if (savedTabState && savedTabState.openTabs.length > 0) {
+          // Filter out tabs for documents that no longer exist
+          const validTabs = savedTabState.openTabs.filter(tab => 
+            tab.documentId && docs.some(doc => doc.id === String(tab.documentId))
+          );
+          
+          if (validTabs.length > 0) {
+            setOpenTabs(validTabs);
+            
+            // Restore active tab if it exists
+            if (savedTabState.activeTabId && validTabs.some(tab => tab.id === savedTabState.activeTabId)) {
+              setActiveTabId(savedTabState.activeTabId);
+              
+              // Set the active document
+              const activeTab = validTabs.find(tab => tab.id === savedTabState.activeTabId);
+              if (activeTab && activeTab.documentId) {
+                const activeDoc = docs.find(doc => doc.id === String(activeTab.documentId));
+                if (activeDoc) {
+                  setActiveDocument(activeDoc);
+                }
+              }
+            } else if (validTabs.length > 0) {
+              // If saved active tab doesn't exist, use the first tab
+              const firstTab = validTabs[0];
+              setActiveTabId(firstTab.id);
+              if (firstTab.documentId) {
+                const doc = docs.find(d => d.id === String(firstTab.documentId));
+                if (doc) {
+                  setActiveDocument(doc);
+                }
+              }
+            }
+          }
+        }
+        
         setIsLoading(false);
       } catch (error) {
         console.error('Failed to load documents:', error);
@@ -54,6 +93,14 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     loadDocuments();
   }, []);
+
+  // Save tab state whenever tabs or active tab changes
+  useEffect(() => {
+    // Don't save during initial load
+    if (!isLoading) {
+      TabStateService.saveTabState(openTabs, activeTabId);
+    }
+  }, [openTabs, activeTabId, isLoading]);
 
   // Create a new document
   const createDocument = useCallback(async (

@@ -46,7 +46,9 @@ function AppContent() {
         openDocument: openContextDocument,
         saveDocument,
         closeDocument,
-        documentStates
+        documentStates,
+        openTabs,
+        activeTabId
     } = useDocuments();
 
     const {currentTheme} = useSettings();
@@ -399,24 +401,8 @@ function AppContent() {
                     initializeDefaultLayout(event.api);
                 }
 
-                // After restoring layout, find the first editor panel and make its document active
-                setTimeout(() => {
-                    const groups = event.api.groups;
-                    for (const group of groups) {
-                        for (const panel of group.panels) {
-                            if (panel.id.startsWith('editor-')) {
-                                const docId = panel.id.replace('editor-', '');
-                                const numericId = parseInt(docId, 10);
-                                if (!isNaN(numericId)) {
-                                    console.log(`[App] Setting active document from restored layout: ${numericId}`);
-                                    openContextDocument(numericId);
-                                    panel.focus();
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }, 100);
+                // Active tab restoration will be handled by the separate useEffect
+                // that syncs dockview panels with saved tabs
             } catch (e) {
                 console.error('Error restoring layout:', e);
                 initializeDefaultLayout(event.api);
@@ -455,6 +441,51 @@ function AppContent() {
         documentPreview: DocumentPreviewPanel,
         properties: PropertiesPanel
     }), []);
+
+    // Sync dockview panels with saved tabs when dockview is ready
+    useEffect(() => {
+        if (dockviewApi && !isLoading && openTabs.length > 0) {
+            // Small delay to ensure layout is fully restored first
+            const timeoutId = setTimeout(() => {
+                // Check if we need to open any tabs that aren't already open
+                openTabs.forEach(tab => {
+                    if (tab.documentId) {
+                        const panelId = `editor-${tab.documentId}`;
+                        const existingPanel = dockviewApi.getPanel(panelId);
+                        if (!existingPanel) {
+                            // Panel doesn't exist, open it
+                            const doc = documents.find(d => d.id === String(tab.documentId));
+                            if (doc) {
+                                dockviewApi.addPanel({
+                                    id: panelId,
+                                    component: 'documentEditor',
+                                    params: { document: doc, documentId: tab.documentId },
+                                    title: tab.title
+                                });
+                            }
+                        }
+                    }
+                });
+
+                // Focus the active tab if it exists
+                if (activeTabId) {
+                    const activeTab = openTabs.find(t => t.id === activeTabId);
+                    if (activeTab && activeTab.documentId) {
+                        const panelId = `editor-${activeTab.documentId}`;
+                        const panel = dockviewApi.getPanel(panelId);
+                        if (panel) {
+                            console.log(`[App] Focusing active tab panel: ${activeTab.documentId}`);
+                            panel.focus();
+                            // Also ensure the document is set as active
+                            openContextDocument(activeTab.documentId);
+                        }
+                    }
+                }
+            }, 200); // Give layout restoration time to complete
+
+            return () => clearTimeout(timeoutId);
+        }
+    }, [dockviewApi, isLoading, openTabs, activeTabId, documents, openContextDocument]);
 
     // Setup save layout function reference
     useEffect(() => {
