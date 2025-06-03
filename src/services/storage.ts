@@ -59,36 +59,127 @@ export const initializeSettings = async (): Promise<Settings> => {
 
 // Document operations
 export const saveDocument = async (document: Document): Promise<number> => {
-  // Create a safe copy of the document to prevent serialization issues
-  const safeDocument = {
-    ...document,
-    // Ensure content is always a string
-    content: document.content || '',
-    // Ensure dates are properly serialized
-    createdAt: document.createdAt instanceof Date ? document.createdAt : new Date(document.createdAt || Date.now()),
-    updatedAt: new Date()
-  };
+  try {
+    // Create a safe copy of the document to prevent serialization issues
+    const safeDocument = {
+      ...document,
+      // Ensure content is always a string
+      content: document.content || '',
+      // Ensure dates are properly serialized
+      createdAt: document.createdAt instanceof Date ? document.createdAt : new Date(document.createdAt || Date.now()),
+      updatedAt: new Date()
+    };
 
-  // Check if document has a valid ID (not undefined, not empty string)
-  if (document.id && document.id !== "") {
-    // Don't include the id field when adding new document
-    const { id, ...documentWithoutId } = safeDocument;
-    await db.documents.update(parseInt(document.id, 10), documentWithoutId);
-    return parseInt(document.id, 10);
-  } else {
-    // Remove id field for new documents to let Dexie auto-generate it
-    const { id, ...documentWithoutId } = safeDocument;
-    const newId = await db.documents.add(documentWithoutId);
-    return newId;
+    // Check if document has a valid ID (not undefined, not empty string)
+    if (document.id && document.id !== "") {
+      const numericId = parseInt(document.id, 10);
+      if (isNaN(numericId)) {
+        throw new Error(`Invalid document ID: ${document.id}`);
+      }
+      
+      // Don't include the id field when updating
+      const { id, ...documentWithoutId } = safeDocument;
+      
+      // Check if document exists before updating
+      const exists = await db.documents.get(numericId);
+      if (!exists) {
+        console.warn(`Document with ID ${numericId} not found, creating new document instead`);
+        const newId = await db.documents.add(documentWithoutId);
+        return newId;
+      }
+      
+      await db.documents.update(numericId, documentWithoutId);
+      return numericId;
+    } else {
+      // Remove id field for new documents to let Dexie auto-generate it
+      const { id, ...documentWithoutId } = safeDocument;
+      const newId = await db.documents.add(documentWithoutId);
+      return newId;
+    }
+  } catch (error) {
+    console.error('Error saving document:', error);
+    throw error;
   }
 };
 
 export const getDocument = async (id: number): Promise<Document | undefined> => {
-  return await db.documents.get(id);
+  console.log(`[Storage] Getting document with ID: ${id}`);
+  try {
+    const doc = await db.documents.get(id);
+    console.log(`[Storage] Raw document from DB:`, doc);
+    
+    if (doc) {
+      // Create a new object to avoid modifying the original
+      const processedDoc: Document = { ...doc };
+      
+      // Ensure document has string ID
+      processedDoc.id = String(id);
+      
+      // Ensure document has proper type structure
+      if (typeof processedDoc.type === 'string') {
+        const typeStr = processedDoc.type as string;
+        let icon = 'ri-file-text-line';
+        
+        // Set appropriate icon based on type
+        if (typeStr === 'markdown') icon = 'ri-markdown-line';
+        else if (typeStr === 'code') icon = 'ri-code-line';
+        else if (typeStr === 'html') icon = 'ri-html5-line';
+        else if (typeStr === 'richtext') icon = 'ri-file-text-line';
+        
+        processedDoc.type = {
+          type: typeStr,
+          label: typeStr.charAt(0).toUpperCase() + typeStr.slice(1),
+          icon: icon,
+          description: `${typeStr.charAt(0).toUpperCase() + typeStr.slice(1)} document`
+        };
+      }
+      
+      console.log(`[Storage] Processed document:`, processedDoc);
+      return processedDoc;
+    }
+    
+    console.log(`[Storage] Document not found`);
+    return undefined;
+  } catch (error) {
+    console.error(`[Storage] Error getting document:`, error);
+    return undefined;
+  }
 };
 
 export const getAllDocuments = async (): Promise<Document[]> => {
-  return await db.documents.orderBy('updatedAt').reverse().toArray();
+  const docs = await db.documents.orderBy('updatedAt').reverse().toArray();
+  
+  // Ensure all documents have proper structure
+  return docs.map(doc => {
+    // Dexie automatically includes the id field when using ++id
+    const processedDoc = { ...doc };
+    
+    // Ensure ID is a string
+    if (processedDoc.id !== undefined) {
+      processedDoc.id = String(processedDoc.id);
+    }
+    
+    // Ensure document has proper type structure
+    if (typeof processedDoc.type === 'string') {
+      const typeStr = processedDoc.type as string;
+      let icon = 'ri-file-text-line';
+      
+      // Set appropriate icon based on type
+      if (typeStr === 'markdown') icon = 'ri-markdown-line';
+      else if (typeStr === 'code') icon = 'ri-code-line';
+      else if (typeStr === 'html') icon = 'ri-html5-line';
+      else if (typeStr === 'richtext') icon = 'ri-file-text-line';
+      
+      processedDoc.type = {
+        type: typeStr,
+        label: typeStr.charAt(0).toUpperCase() + typeStr.slice(1),
+        icon: icon,
+        description: `${typeStr.charAt(0).toUpperCase() + typeStr.slice(1)} document`
+      };
+    }
+    
+    return processedDoc as Document;
+  });
 };
 
 export const deleteDocument = async (id: number): Promise<void> => {
@@ -97,12 +188,44 @@ export const deleteDocument = async (id: number): Promise<void> => {
 
 export const searchDocuments = async (query: string): Promise<Document[]> => {
   // Simple search implementation - can be enhanced with full-text search
-  return db.documents
+  const docs = await db.documents
     .filter(doc =>
       doc.title.toLowerCase().includes(query.toLowerCase()) ||
       doc.content.toLowerCase().includes(query.toLowerCase())
     )
     .toArray();
+  
+  // Ensure all documents have proper structure
+  return docs.map(doc => {
+    // Dexie automatically includes the id field when using ++id
+    const processedDoc = { ...doc };
+    
+    // Ensure ID is a string
+    if (processedDoc.id !== undefined) {
+      processedDoc.id = String(processedDoc.id);
+    }
+    
+    // Ensure document has proper type structure
+    if (typeof processedDoc.type === 'string') {
+      const typeStr = processedDoc.type as string;
+      let icon = 'ri-file-text-line';
+      
+      // Set appropriate icon based on type
+      if (typeStr === 'markdown') icon = 'ri-markdown-line';
+      else if (typeStr === 'code') icon = 'ri-code-line';
+      else if (typeStr === 'html') icon = 'ri-html5-line';
+      else if (typeStr === 'richtext') icon = 'ri-file-text-line';
+      
+      processedDoc.type = {
+        type: typeStr,
+        label: typeStr.charAt(0).toUpperCase() + typeStr.slice(1),
+        icon: icon,
+        description: `${typeStr.charAt(0).toUpperCase() + typeStr.slice(1)} document`
+      };
+    }
+    
+    return processedDoc as Document;
+  });
 };
 
 // Snippet operations

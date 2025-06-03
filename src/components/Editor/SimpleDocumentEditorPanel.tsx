@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { IDockviewPanelProps } from 'dockview';
 import SimpleDocumentEditor from './SimpleDocumentEditor';
 import { Document } from '../../types/document';
-import { useDocuments } from '../../contexts/UseDocuments';
+import { useDocuments } from '../../contexts/DocumentProviderV2';
 import * as StorageService from '../../services/storage';
 
 interface SimpleDocumentEditorPanelProps {
@@ -15,24 +15,43 @@ const SimpleDocumentEditorPanel: React.FC<IDockviewPanelProps<SimpleDocumentEdit
   const { documents } = useDocuments();
   const [document, setDocument] = useState<Document | null>(initialDocument);
   
-  // Get the document ID
-  const docId = documentId || (initialDocument?.id ? parseInt(initialDocument.id) : null);
+  // Get the document ID - ensure it's a number
+  // documentId might come as string from restored layout
+  const docId = documentId ? 
+    (typeof documentId === 'string' ? parseInt(documentId) : documentId) :
+    (initialDocument?.id ? 
+      (typeof initialDocument.id === 'string' ? parseInt(initialDocument.id) : initialDocument.id) : 
+      null);
   
   // Load document from context or storage
   useEffect(() => {
+    console.log('[SimpleDocumentEditorPanel] Loading document:', { docId, initialDocument });
+    
     if (docId) {
       // First try to find in context documents
-      const contextDoc = documents.find(d => d.id && parseInt(d.id) === docId);
+      // Documents have string IDs, so compare as strings
+      const contextDoc = documents.find(d => d.id === String(docId));
+      console.log('[SimpleDocumentEditorPanel] Context doc found:', contextDoc);
+      console.log('[SimpleDocumentEditorPanel] Available documents:', documents.map(d => ({ id: d.id, title: d.title })));
+      
       if (contextDoc) {
         setDocument(contextDoc);
       } else {
         // Load from storage if not in context
+        console.log('[SimpleDocumentEditorPanel] Loading from storage with ID:', docId);
         StorageService.getDocument(docId).then(doc => {
+          console.log('[SimpleDocumentEditorPanel] Storage doc loaded:', doc);
           if (doc) {
             setDocument(doc);
           }
+        }).catch(err => {
+          console.error('[SimpleDocumentEditorPanel] Error loading document:', err);
         });
       }
+    } else if (initialDocument) {
+      // If no docId but we have initial document, use it
+      console.log('[SimpleDocumentEditorPanel] Using initial document');
+      setDocument(initialDocument);
     }
   }, [docId, documents]);
   

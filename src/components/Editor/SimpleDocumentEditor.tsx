@@ -26,10 +26,13 @@ const SimpleDocumentEditor: React.FC<SimpleDocumentEditorProps> = ({
   };
   
   // Use auto-save hook
-  const { saveDocument, isSaving, isDirty, lastSaved, lastModified } = useAutoSave({
+  const { saveDocument, isSaving, isDirty, lastSaved, lastModified, error } = useAutoSave({
     document,
     debounceMs: getSaveDelay(document.content?.length || 0),
     onSaveComplete,
+    onSaveError: (err) => {
+      console.error('Failed to save document:', err);
+    }
   });
   
   // Handle content changes
@@ -85,16 +88,28 @@ const SimpleDocumentEditor: React.FC<SimpleDocumentEditorProps> = ({
         <div className="flex items-center space-x-2">
           <span>{document.title}</span>
           <span className="text-gray-500">•</span>
-          <span>{document.type?.type.toUpperCase()}</span>
+          <span>{
+            typeof document.type === 'string' 
+              ? document.type.toUpperCase() 
+              : document.type?.type?.toUpperCase() || 'TEXT'
+          }</span>
         </div>
         
-        <SimpleSaveStatusIndicator
-          isSaving={isSaving}
-          isDirty={isDirty}
-          lastSaved={lastSaved}
-          lastModified={lastModified}
-          saveDelay={getSaveDelay(document.content?.length || 0)}
-        />
+        <div className="flex items-center space-x-2">
+          {error && (
+            <span className="text-red-500 text-xs">
+              <i className="ri-error-warning-line mr-1"></i>
+              Save failed
+            </span>
+          )}
+          <SimpleSaveStatusIndicator
+            isSaving={isSaving}
+            isDirty={isDirty}
+            lastSaved={lastSaved}
+            lastModified={lastModified}
+            saveDelay={getSaveDelay(document.content?.length || 0)}
+          />
+        </div>
       </div>
     </div>
   );

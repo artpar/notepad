@@ -5,7 +5,7 @@ import './styles.css'
 import './App.css'
 import App from './App.tsx'
 import { SettingsProvider } from './contexts/SettingsContext'
-import { DocumentProvider } from './contexts/DocumentContext'
+import { DocumentProvider } from './contexts/DocumentProviderV2'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

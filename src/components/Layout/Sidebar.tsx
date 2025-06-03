@@ -11,7 +11,7 @@ import DocumentTypeMenu from '../UI/DocumentTypeMenu';
 import HelpMenu from '../UI/HelpMenu';
 import useKeyboardShortcuts from '../../hooks/useKeyboardShortcuts';
 import 'remixicon/fonts/remixicon.css';
-import {useDocuments} from "../../contexts/UseDocuments.tsx";
+import {useDocuments} from "../../contexts/DocumentProviderV2.tsx";
 import {DocumentType} from "../../types/DocumentType.tsx";
 import {useToast} from '../UI/ToastSystem';
 
@@ -97,7 +97,9 @@ const Sidebar: React.FC<SidebarProps> = ({onToggleSidebar, onSelectDocument}) =>
                 case 'name':
                     return a.title.localeCompare(b.title);
                 case 'type':
-                    return a.type.type.localeCompare(b.type.type);
+                    const aType = typeof a.type === 'string' ? a.type : a.type?.type || 'text';
+                    const bType = typeof b.type === 'string' ? b.type : b.type?.type || 'text';
+                    return aType.localeCompare(bType);
                 case 'date':
                 default:
                     return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
@@ -186,7 +188,8 @@ const Sidebar: React.FC<SidebarProps> = ({onToggleSidebar, onSelectDocument}) =>
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            const fileName = `${activeDocument.title}.${getFileExtension(activeDocument.type.type)}`;
+            const docType = typeof activeDocument.type === 'string' ? activeDocument.type : activeDocument.type?.type || 'text';
+            const fileName = `${activeDocument.title}.${getFileExtension(docType)}`;
             a.download = fileName;
             document.body.appendChild(a);
             a.click();

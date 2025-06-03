@@ -26,7 +26,7 @@ import * as LayoutService from './services/layoutService';
 import ToastProvider, {useToast} from "./components/UI/ToastSystem.tsx";
 import DocumentSearch from "./components/Search/DocumentSearch.tsx";
 import Welcome from "./components/UI/Welcome.tsx";
-import {useDocuments} from "./contexts/UseDocuments.tsx";
+import {useDocuments} from "./contexts/DocumentProviderV2.tsx";
 import {DocumentType} from "./types/DocumentType.tsx";
 
 // App component wrapper with Toast provider
@@ -365,6 +365,8 @@ function AppContent() {
         if (savedLayout) {
             try {
                 const panelKeys = Object.keys(savedLayout.panels);
+                const panelsToRemove: string[] = [];
+                
                 for (const panelKey of panelKeys) {
                     const panelObject = savedLayout.panels[panelKey];
                     if (!panelObject.params) {
@@ -373,13 +375,16 @@ function AppContent() {
 
                     // Get the document ID from the layout
                     const docId = panelObject.params.documentId || panelObject.params.document?.id;
-                    if (docId) {
+                    if (docId && (panelObject.component === 'documentEditor' || panelObject.component === 'documentPreview')) {
                         // Fetch the latest document from the database
-                        const doc = await StorageService.getDocument(docId);
+                        const numericDocId = typeof docId === 'string' ? parseInt(docId, 10) : docId;
+                        console.log(`[App] Loading document ${numericDocId} for panel ${panelKey}`);
+                        const doc = await StorageService.getDocument(numericDocId);
+                        console.log(`[App] Document ${numericDocId} loaded:`, doc);
                         if (doc) {
                             // Add the document to the panel params
                             panelObject.params.document = doc;
-                            panelObject.params.documentId = typeof docId === 'string' ? parseInt(docId, 10) : docId;
+                            panelObject.params.documentId = numericDocId;
 
                             // Open the document in context to set it as active
                             if (panelObject.component === 'documentEditor') {
@@ -388,12 +393,24 @@ function AppContent() {
                             }
                         } else {
                             console.warn(`Document with ID ${docId} not found in database`);
-                            // Remove this panel if the document doesn't exist anymore
-                            delete savedLayout.panels[panelKey];
+                            // Mark this panel for removal
+                            panelsToRemove.push(panelKey);
                         }
                     }
                 }
-                event.api.fromJSON(savedLayout);
+                
+                // Remove panels for missing documents
+                for (const panelKey of panelsToRemove) {
+                    delete savedLayout.panels[panelKey];
+                }
+                
+                // Only restore layout if there are still panels left
+                if (Object.keys(savedLayout.panels).length > 0) {
+                    event.api.fromJSON(savedLayout);
+                } else {
+                    console.log('No valid panels in saved layout, initializing default layout');
+                    initializeDefaultLayout(event.api);
+                }
 
                 // After restoring layout, find the first editor panel and make its document active
                 setTimeout(() => {

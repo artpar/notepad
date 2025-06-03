@@ -65,6 +65,9 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, readOnly = fa
     updateContent(content);
   }, [document.id, readOnly, setDocumentContent, setDocumentState, updateContent]);
 
+  // Get document type
+  const docType = document ? (typeof document.type === 'string' ? document.type : document.type?.type || 'text') : 'text';
+
   // Render the appropriate editor
   const renderEditor = () => {
     if (!document) {
@@ -72,8 +75,8 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, readOnly = fa
     }
 
     const content = document.content || '';
-
-    switch (document.type.type) {
+    
+    switch (docType) {
       case 'markdown':
         return (
           <MarkdownEditor
@@ -97,7 +100,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, readOnly = fa
         return (
           <CodeEditor
             content={content}
-            language={document.type.type === 'html' ? 'html' : document.language || 'plaintext'}
+            language={docType === 'html' ? 'html' : document.language || 'plaintext'}
             onChange={handleContentChange}
             readOnly={readOnly}
           />
@@ -116,7 +119,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, readOnly = fa
       <div className="flex items-center justify-between px-3 py-1 text-xs border-t bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700">
         <div className="flex items-center space-x-4">
           <span className="text-gray-600 dark:text-gray-400">
-            {document.type.type.charAt(0).toUpperCase() + document.type.type.slice(1)}
+            {docType.charAt(0).toUpperCase() + docType.slice(1)}
             {document.language && ` • ${document.language}`}
           </span>
         </div>

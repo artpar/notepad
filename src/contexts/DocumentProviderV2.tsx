@@ -133,7 +133,14 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (!document) {
       document = await StorageService.getDocument(id);
       if (document) {
-        setDocuments(prev => [...prev, document!]);
+        // Check again to prevent race conditions
+        setDocuments(prev => {
+          const exists = prev.some(d => d.id === String(id));
+          if (exists) {
+            return prev;
+          }
+          return [...prev, document!];
+        });
       }
     }
 
