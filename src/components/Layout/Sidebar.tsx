@@ -47,6 +47,7 @@ const Sidebar: React.FC<SidebarProps> = ({onToggleSidebar, onSelectDocument}) =>
     const [newDocumentTitle, setNewDocumentTitle] = useState('');
     const [sortOption, setSortOption] = useState<'name' | 'date' | 'type'>('date');
     const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+    const [showHelpMenu, setShowHelpMenu] = useState(false);
 
     // Refs
     const sidebarRef = useRef<HTMLDivElement>(null);
@@ -339,6 +340,32 @@ const Sidebar: React.FC<SidebarProps> = ({onToggleSidebar, onSelectDocument}) =>
                 onClose={closeContextMenu}
             />
 
+            {/* Help Menu Modal */}
+            {showHelpMenu && (
+                <div 
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+                    onClick={() => setShowHelpMenu(false)}
+                >
+                    <div 
+                        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md w-full mx-4"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Help & Shortcuts</h2>
+                            <button
+                                onClick={() => setShowHelpMenu(false)}
+                                className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            >
+                                <svg className="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <HelpMenu getShortcutKey={getShortcutKey}/>
+                    </div>
+                </div>
+            )}
+
             {/* Main sidebar container */}
             <div
                 ref={sidebarRef}
@@ -379,51 +406,94 @@ const Sidebar: React.FC<SidebarProps> = ({onToggleSidebar, onSelectDocument}) =>
                             onClick={() => setShowOptionsMenu(!showOptionsMenu)}
                             title="Options"
                         >
-                            <div className="p-2 min-w-[160px]">
-                                <div className="space-y-1">
-                                    {/* Sort options */}
-                                    <div className="px-2 py-1 text-xs font-medium opacity-50">Sort by</div>
+                            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-2 min-w-[200px]">
+                                <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+                                    <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Sort by</h3>
+                                </div>
+                                
+                                <div className="py-1">
                                     {(['date', 'name', 'type'] as const).map(option => (
                                         <button
                                             key={option}
-                                            className={`w-full text-left px-3 py-1.5 text-sm rounded hover:bg-opacity-10 hover:bg-gray-500 flex items-center ${sortOption === option ? 'font-medium' : ''}`}
-                                            style={{
-                                                backgroundColor: sortOption === option ? currentTheme.colors.buttonActiveBackground : 'transparent',
-                                            }}
+                                            className={`w-full text-left px-4 py-2 text-sm flex items-center gap-3 transition-colors ${
+                                                sortOption === option 
+                                                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' 
+                                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'
+                                            }`}
                                             onClick={() => {
                                                 setSortOption(option);
                                                 setShowOptionsMenu(false);
                                             }}
                                         >
-                                            <i className={`ri-${option === 'date' ? 'time' : option === 'name' ? 'sort-alphabet' : 'folder-2'}-line mr-2`}></i>
-                                            {option === 'date' ? 'Last modified' : option === 'name' ? 'Name' : 'Type'}
+                                            <span className={`w-5 h-5 flex items-center justify-center ${sortOption === option ? 'text-blue-600 dark:text-blue-400' : ''}`}>
+                                                {option === 'date' && (
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                )}
+                                                {option === 'name' && (
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                                                    </svg>
+                                                )}
+                                                {option === 'type' && (
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                                                    </svg>
+                                                )}
+                                            </span>
+                                            <span className="flex-1">
+                                                {option === 'date' ? 'Last modified' : option === 'name' ? 'Name' : 'Type'}
+                                            </span>
+                                            {sortOption === option && (
+                                                <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            )}
                                         </button>
                                     ))}
+                                </div>
 
-                                    <div className="my-1 border-t" style={{borderColor: currentTheme.colors.border}}></div>
+                                <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
 
+                                <div className="py-1">
                                     {/* Theme toggle */}
                                     <button
-                                        className="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-opacity-10 hover:bg-gray-500 flex items-center"
+                                        className="w-full text-left px-4 py-2 text-sm flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
                                         onClick={() => {
                                             toggleTheme();
                                             setShowOptionsMenu(false);
                                         }}
                                     >
-                                        <i className={`ri-${currentTheme.isDark ? 'sun' : 'moon'}-line mr-2`}></i>
-                                        {currentTheme.isDark ? 'Light Mode' : 'Dark Mode'}
+                                        <span className="w-5 h-5 flex items-center justify-center">
+                                            {currentTheme.isDark ? (
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                                                </svg>
+                                            ) : (
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                                                </svg>
+                                            )}
+                                        </span>
+                                        <span className="flex-1">{currentTheme.isDark ? 'Light Mode' : 'Dark Mode'}</span>
                                     </button>
 
                                     {/* Help */}
-                                    <MenuButton
-                                        icon="question-line"
-                                        onClick={() => {}}
-                                        title="Help"
-                                        className="w-full !p-0"
-                                        dropdownAlign="left"
+                                    <button
+                                        className="w-full text-left px-4 py-2 text-sm flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
+                                        onClick={() => {
+                                            setShowOptionsMenu(false);
+                                            setShowHelpMenu(true);
+                                        }}
                                     >
-                                        <HelpMenu getShortcutKey={getShortcutKey}/>
-                                    </MenuButton>
+                                        <span className="w-5 h-5 flex items-center justify-center">
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        </span>
+                                        <span className="flex-1">Help & Shortcuts</span>
+                                    </button>
                                 </div>
                             </div>
                         </MenuButton>
