@@ -4,7 +4,7 @@ import './App.css';
 import {useSettings} from './contexts/SettingsContext';
 import {Document} from './types/document';
 
-import {DockviewReact, DockviewReadyEvent, DockviewApi, PanelCollection, SerializedDockview} from 'dockview';
+import {DockviewApi, DockviewReact, DockviewReadyEvent, PanelCollection, SerializedDockview} from 'dockview';
 import 'dockview/dist/styles/dockview.css';
 import 'remixicon/fonts/remixicon.css';
 import {AnimatePresence, motion} from 'framer-motion';
@@ -13,12 +13,10 @@ import {AnimatePresence, motion} from 'framer-motion';
 import Sidebar from './components/Layout/Sidebar';
 import SimpleDocumentEditorPanel from './components/Editor/SimpleDocumentEditorPanel';
 import DocumentPreviewPanel from './components/Preview/DocumentPreviewPanel';
-import ExplorerPanel from './components/Explorer/ExplorerPanel';
 import PropertiesPanel from './components/Properties/PropertiesPanel';
 import {CustomGroupPanel, CustomWatermarkPanel} from './components/Panels/CustomPanels';
 import ConfirmationModal from './components/UI/ConfirmationModal';
 import ContextMenu, {ContextMenuItem} from './components/UI/ContextMenu';
-import SimpleSaveStatusIndicator from './components/UI/SimpleSaveStatusIndicator';
 
 // Import services and utils
 import * as StorageService from './services/storage';
@@ -32,8 +30,8 @@ import {DocumentType} from "./types/DocumentType.tsx";
 // App component wrapper with Toast provider
 const AppWithProviders = () => {
     return (<ToastProvider>
-            <AppContent/>
-        </ToastProvider>);
+        <AppContent/>
+    </ToastProvider>);
 };
 
 // Main App content component
@@ -66,10 +64,6 @@ function AppContent() {
     // Add global search state
     const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-    // Add welcome screen state
-    const [showWelcome, setShowWelcome] = useState(false);
-
-
     // Save layout reference - keeping this outside the lifecycle
     const saveLayoutRef = useRef<() => void>(() => {
     });
@@ -96,7 +90,7 @@ function AppContent() {
                     dockviewApi.addPanel({
                         id: `editor-${id}`,
                         component: 'documentEditor',
-                        params: { document: newDoc, documentId: id },
+                        params: {document: newDoc, documentId: id},
                         title: newDoc.title
                     });
                     saveLayoutRef.current();
@@ -126,7 +120,7 @@ function AppContent() {
                 dockviewApi.addPanel({
                     id: `editor-${doc.id}`,
                     component: 'documentEditor',
-                    params: { document: doc, documentId: parseInt(doc.id) },
+                    params: {document: doc, documentId: parseInt(doc.id)},
                     title: doc.title
                 });
             }
@@ -256,9 +250,12 @@ function AppContent() {
         } else {
             // Create panel config
             const panelConfig = {
-                id: previewPanelId, component: 'documentPreview', params: {
+                id: previewPanelId,
+                component: 'documentPreview',
+                params: {
                     document: activeDocument
-                }, title: `Preview: ${activeDocument.title}`,
+                },
+                title: `Preview: ${activeDocument.title}`,
                 position: undefined as { referencePanel: string; direction: string } | undefined
             };
 
@@ -336,26 +333,16 @@ function AppContent() {
 
     // Initialize default layout
     const initializeDefaultLayout = useCallback((api: DockviewApi) => {
-        // Add explorer panel by default
-        api.addPanel({
-            id: 'explorer', component: 'explorer', params: {
-                documents,
-                onSelectDocument: openDocument,
-                onCreateDocument: createDocument,
-                onDeleteDocument: deleteDocument
-            }, title: 'Explorer'
-        });
-
         // If we have an active document, open it
         if (activeDocument) {
             api.addPanel({
                 id: `editor-${activeDocument.id}`,
                 component: 'documentEditor',
-                params: { document: activeDocument, documentId: parseInt(activeDocument.id) },
+                params: {document: activeDocument, documentId: parseInt(activeDocument.id)},
                 title: activeDocument.title
             });
         }
-    }, [activeDocument, documents, openDocument, createDocument, deleteDocument, updateDocument]);
+    }, [activeDocument]);
 
     // Handle dockview ready event
     const handleDockviewReady = useCallback(async (event: DockviewReadyEvent) => {
@@ -466,7 +453,6 @@ function AppContent() {
     const components = useMemo<PanelCollection>(() => ({
         documentEditor: SimpleDocumentEditorPanel,
         documentPreview: DocumentPreviewPanel,
-        explorer: ExplorerPanel,
         properties: PropertiesPanel
     }), []);
 
@@ -562,133 +548,111 @@ function AppContent() {
             document.body.classList.remove('dark-mode');
         }
     }, [currentTheme.isDark]);
-
-    // Check if this is the first run and show welcome
-    useEffect(() => {
-        const hasSeenWelcome = localStorage.getItem('engineers-notepad-welcome-seen');
-        if (!hasSeenWelcome && !isLoading) {
-            setShowWelcome(true);
-            // Mark welcome as seen for future visits
-            localStorage.setItem('engineers-notepad-welcome-seen', 'true');
-        }
-    }, [isLoading]);
-
     // Render the UI
     return (<div
-            className="app-container h-screen flex flex-col overflow-hidden"
-            style={{
-                backgroundColor: currentTheme.colors.background, color: currentTheme.colors.foreground
-            }}
-        >
+        className="app-container h-screen flex flex-col overflow-hidden"
+        style={{
+            backgroundColor: currentTheme.colors.background, color: currentTheme.colors.foreground
+        }}
+    >
 
-            {/* Confirmation Modal for deletion */}
-            <ConfirmationModal
-                isOpen={documentToDelete !== null}
-                title="Delete Document"
-                message={`Are you sure you want to delete "${documentToDelete?.title}"? This action cannot be undone.`}
-                confirmLabel="Delete"
-                cancelLabel="Cancel"
-                isDestructive={true}
-                icon="ri-delete-bin-line"
-                onConfirm={handleConfirmDelete}
-                onCancel={handleCancelDelete}
-            />
+        {/* Confirmation Modal for deletion */}
+        <ConfirmationModal
+            isOpen={documentToDelete !== null}
+            title="Delete Document"
+            message={`Are you sure you want to delete "${documentToDelete?.title}"? This action cannot be undone.`}
+            confirmLabel="Delete"
+            cancelLabel="Cancel"
+            isDestructive={true}
+            icon="ri-delete-bin-line"
+            onConfirm={handleConfirmDelete}
+            onCancel={handleCancelDelete}
+        />
 
-            {/* Context Menu for document actions */}
-            <ContextMenu
-                items={getContextMenuItems()}
-                position={contextMenu.position}
-                onClose={closeContextMenu}
-            />
+        {/* Context Menu for document actions */}
+        <ContextMenu
+            items={getContextMenuItems()}
+            position={contextMenu.position}
+            onClose={closeContextMenu}
+        />
 
-            {/* Global Document Search */}
-            <DocumentSearch
-                documents={documents}
-                onSelectDocument={openDocument}
-                onClose={() => setIsSearchOpen(false)}
-                isOpen={isSearchOpen}
-            />
+        {/* Global Document Search */}
+        <DocumentSearch
+            documents={documents}
+            onSelectDocument={openDocument}
+            onClose={() => setIsSearchOpen(false)}
+            isOpen={isSearchOpen}
+        />
 
-            {/* Welcome screen for first-time users */}
-            <Welcome
-                isOpen={showWelcome}
-                onClose={() => setShowWelcome(false)}
-                onCreateDocument={createDocument}
-            />
-
-            {/* Loading overlay */}
-            <AnimatePresence>
-                {isLoading && (<motion.div
-                        initial={{opacity: 1}}
-                        animate={{opacity: 1}}
-                        exit={{opacity: 0}}
-                        transition={{duration: 0.5}}
-                        className="fixed inset-0 z-50 flex items-center justify-center"
-                        style={{backgroundColor: currentTheme.colors.background}}
-                    >
-                        <div className="text-center">
-                            <i className="ri-quill-pen-line text-6xl mb-4"
-                               style={{color: currentTheme.colors.accent}}></i>
-                            <h1 className="text-2xl font-bold mb-2">Engineer's Notepad</h1>
-                            <p className="text-lg opacity-70">Loading your workspace...</p>
-                        </div>
-                    </motion.div>)}
-            </AnimatePresence>
-
-            <div className="app-content flex-1 flex overflow-hidden">
-                {/* Sidebar - conditionally rendered based on showSidebar state */}
-                {showSidebar && (<Sidebar
-                        onToggleSidebar={toggleSidebar}
-                        onSelectDocument={openDocument}
-                    />)}
-
-                {/* Main content area with dockview */}
-                <div className="flex-1 overflow-hidden relative">
-                    {/* Show sidebar button when sidebar is hidden */}
-                    {!showSidebar && (
-                        <button
-                            onClick={toggleSidebar}
-                            className="absolute top-4 left-4 z-40 p-2 rounded-md shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
-                            style={{
-                                backgroundColor: currentTheme.colors.background,
-                                border: `1px solid ${currentTheme.colors.border}`,
-                                color: currentTheme.colors.buttonText
-                            }}
-                            title="Show Sidebar (Ctrl+B)"
-                        >
-                            <i className="ri-menu-unfold-line text-lg"></i>
-                        </button>
-                    )}
-
-                    <DockviewReact
-                        components={components}
-                        onReady={handleDockviewReady}
-                        watermarkComponent={CustomWatermarkPanel}
-                        groupPanel={CustomGroupPanel}
-                        className={`dockview-theme-${currentTheme.isDark ? 'dark' : 'light'}`}
-                    />
-                </div>
-            </div>
-
-            <footer className="app-footer p-2 text-xs border-t flex justify-between items-center"
-                    style={{
-                        backgroundColor: currentTheme.colors.sidebar, borderColor: currentTheme.colors.border
-                    }}
+        {/* Loading overlay */}
+        <AnimatePresence>
+            {isLoading && (<motion.div
+                initial={{opacity: 1}}
+                animate={{opacity: 1}}
+                exit={{opacity: 0}}
+                transition={{duration: 0.5}}
+                className="fixed inset-0 z-50 flex items-center justify-center"
+                style={{backgroundColor: currentTheme.colors.background}}
             >
-                <div className="flex space-x-4">
-                    {activeDocument && (
-                        <span className="flex items-center">
+                <div className="text-center">
+                    <i className="ri-quill-pen-line text-6xl mb-4"
+                       style={{color: currentTheme.colors.accent}}></i>
+                    <h1 className="text-2xl font-bold mb-2">Engineer's Notepad</h1>
+                    <p className="text-lg opacity-70">Loading your workspace...</p>
+                </div>
+            </motion.div>)}
+        </AnimatePresence>
+
+        <div className="app-content flex-1 flex overflow-hidden">
+            {/* Sidebar - conditionally rendered based on showSidebar state */}
+            {showSidebar && (<Sidebar
+                onToggleSidebar={toggleSidebar}
+                onSelectDocument={openDocument}
+            />)}
+
+            {/* Main content area with dockview */}
+            <div className="flex-1 overflow-hidden relative">
+                {/* Show sidebar button when sidebar is hidden */}
+                {!showSidebar && (<button
+                        onClick={toggleSidebar}
+                        className="absolute top-4 left-4 z-40 p-2 rounded-md shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
+                        style={{
+                            backgroundColor: currentTheme.colors.background,
+                            border: `1px solid ${currentTheme.colors.border}`,
+                            color: currentTheme.colors.buttonText
+                        }}
+                        title="Show Sidebar (Ctrl+B)"
+                    >
+                        <i className="ri-menu-unfold-line text-lg"></i>
+                    </button>)}
+
+                <DockviewReact
+                    components={components}
+                    onReady={handleDockviewReady}
+                    watermarkComponent={CustomWatermarkPanel}
+                    groupPanel={CustomGroupPanel}
+                    className={`dockview-theme-${currentTheme.isDark ? 'dark' : 'light'}`}
+                />
+            </div>
+        </div>
+
+        <footer className="app-footer p-2 text-xs border-t flex justify-between items-center"
+                style={{
+                    backgroundColor: currentTheme.colors.sidebar, borderColor: currentTheme.colors.border
+                }}
+        >
+            <div className="flex space-x-4">
+                {activeDocument && (<span className="flex items-center">
                             <i className="ri-file-type-line mr-1"></i>
-                            {activeDocument.type.type.toUpperCase()}
-                            {activeDocument.language && ` - ${activeDocument.language}`}
-                        </span>
-                    )}
-                </div>
-                <div className="text-gray-500">
-                    Offline Mode
-                </div>
-            </footer>
-        </div>);
+                        {activeDocument.type.type.toUpperCase()}
+                        {activeDocument.language && ` - ${activeDocument.language}`}
+                        </span>)}
+            </div>
+            <div className="text-gray-500">
+                Offline Mode
+            </div>
+        </footer>
+    </div>);
 }
 
 export default AppWithProviders;
