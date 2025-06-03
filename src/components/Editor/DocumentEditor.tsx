@@ -1,135 +1,142 @@
-// src/components/Editor/DocumentEditor.tsx
-import React, {useEffect, useState} from 'react';
-import {calculateDocumentStats, Document} from '../../types/document';
+import React, { useCallback } from 'react';
+import { Document } from '../../types/document';
 import CodeEditor from './CodeEditor';
 import MarkdownEditor from './MarkdownEditor';
 import RichTextEditor from './RichTextEditor';
-import {useSettings} from '../../contexts/SettingsContext';
-import {useToast} from '../UI/ToastSystem';
+import { useAutoSave } from '../../hooks/useAutoSave';
+import { useDocuments } from '../../contexts/DocumentProviderV2';
+import { useToast } from '../UI/ToastSystem';
+import { useSettings } from '../../contexts/SettingsContext';
 
 interface DocumentEditorProps {
-    document: Document;
-    onUpdate: (content: string) => void;
-    readOnly?: boolean;
-    showInfo?: boolean;
+  document: Document;
+  readOnly?: boolean;
 }
 
-const DocumentEditor: React.FC<DocumentEditorProps> = ({
-                                                           document, onUpdate, readOnly = false, showInfo = false
-                                                       }) => {
-    const {settings, currentTheme} = useSettings();
-    const [stats, setStats] = useState(document && document.content ? calculateDocumentStats(document.content) : { wordCount: 0, characterCount: 0, lineCount: 0, readingTimeMinutes: 0 });
-    const {showToast} = useToast();
-    const [lastSaved, setLastSaved] = useState<Date>(document?.updatedAt || new Date());
+const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, readOnly = false }) => {
+  const { setDocumentContent, setDocumentState } = useDocuments();
+  const { showToast } = useToast();
+  const { settings } = useSettings();
 
-    // Map DocType to editor component
-    const getEditorComponent = () => {
-        if (!document) {
-            // Return a placeholder or loading state if document is not available
-            return <div className="h-full flex items-center justify-center">Loading document...</div>;
-        }
+  // Use the auto-save hook
+  const {
+    updateContent,
+    saveNow,
+    isSaving,
+    isDirty,
+    lastSaved
+  } = useAutoSave(document, {
+    delay: settings.editor.autoSave ? settings.editor.autoSaveInterval * 1000 : 2000,
+    enabled: !readOnly && settings.editor.autoSave,
+    onSaveStart: () => {
+      if (document.id) {
+        setDocumentState(parseInt(document.id), { isSaving: true });
+      }
+    },
+    onSaveComplete: () => {
+      if (document.id) {
+        setDocumentState(parseInt(document.id), {
+          isSaving: false,
+          isDirty: false,
+          lastSaved: new Date()
+        });
+      }
+      showToast('Document saved', { type: 'success', duration: 2000 });
+    },
+    onSaveError: (error) => {
+      if (document.id) {
+        setDocumentState(parseInt(document.id), { isSaving: false });
+      }
+      showToast(`Failed to save: ${error.message}`, { type: 'error' });
+    }
+  });
 
-        // Ensure document.content is always treated as a string
-        // This prevents issues when content might be null or undefined during saving
-        const content = document.content || '';
+  // Handle content changes
+  const handleContentChange = useCallback((content: string) => {
+    if (readOnly || !document.id) return;
 
-        switch (document.type.type) {
-            case 'markdown':
-                return (<MarkdownEditor
-                        content={content}
-                        onChange={handleContentChange}
-                    />);
+    // Update local state immediately for responsive UI
+    setDocumentContent(parseInt(document.id), content);
 
-            case 'richtext':
-                return (<RichTextEditor
-                        content={content}
-                        onChange={handleContentChange}
-                    />);
+    // Update document state to show it's dirty
+    setDocumentState(parseInt(document.id), { isDirty: true });
 
-            case 'html':
-            case 'code':
-            case 'text':
-            default:
-                return (<CodeEditor
-                        content={content}
-                        language={document.type.type === 'html' ? 'html' : document.language || 'plaintext'}
-                        onChange={handleContentChange}
-                        readOnly={readOnly}
-                    />);
-        }
-    };
+    // Trigger auto-save
+    updateContent(content);
+  }, [document.id, readOnly, setDocumentContent, setDocumentState, updateContent]);
 
-    // Handle content updates
-    const handleContentChange = (content: string) => {
-        if (typeof onUpdate === 'function' && !readOnly) {
-            onUpdate(content);
-            setLastSaved(new Date());
+  // Render the appropriate editor
+  const renderEditor = () => {
+    if (!document) {
+      return <div className="h-full flex items-center justify-center">Loading document...</div>;
+    }
 
-            // Update statistics
-            if (settings.editor.showStatistics) {
-                const newStats = calculateDocumentStats(content);
-                setStats(newStats);
-            }
-        }
-    };
+    const content = document.content || '';
 
-    // Auto-save functionality
-    useEffect(() => {
-        let autoSaveInterval: any;
+    switch (document.type.type) {
+      case 'markdown':
+        return (
+          <MarkdownEditor
+            content={content}
+            onChange={handleContentChange}
+          />
+        );
 
-        if (settings.editor.autoSave && !readOnly) {
-            autoSaveInterval = setInterval(() => {
-                showToast('Document auto-saved', {type: 'success', duration: 2000});
-                // The actual save happens through onUpdate, this just shows a notification
-            }, settings.editor.autoSaveInterval * 1000);
-        }
+      case 'richtext':
+        return (
+          <RichTextEditor
+            content={content}
+            onChange={handleContentChange}
+          />
+        );
 
-        return () => {
-            if (autoSaveInterval) {
-                clearInterval(autoSaveInterval);
-            }
-        };
-    }, [settings.editor.autoSave, settings.editor.autoSaveInterval, readOnly]);
+      case 'html':
+      case 'code':
+      case 'text':
+      default:
+        return (
+          <CodeEditor
+            content={content}
+            language={document.type.type === 'html' ? 'html' : document.language || 'plaintext'}
+            onChange={handleContentChange}
+            readOnly={readOnly}
+          />
+        );
+    }
+  };
 
-    // Update stats when document changes
-    useEffect(() => {
-        if (document && document.content && settings.editor.showStatistics) {
-            setStats(calculateDocumentStats(document.content));
-        }
-        if (document?.updatedAt) {
-            setLastSaved(document.updatedAt);
-        }
-    }, [document, settings.editor.showStatistics]);
+  return (
+    <div className="h-full flex flex-col">
+      {/* Editor */}
+      <div className="flex-1 overflow-hidden">
+        {renderEditor()}
+      </div>
 
-    return (<div className="h-full flex flex-col">
-            {/* Document editor */}
-            <div className="flex-1 overflow-hidden">
-                {getEditorComponent()}
-            </div>
+      {/* Status bar */}
+      <div className="flex items-center justify-between px-3 py-1 text-xs border-t bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+        <div className="flex items-center space-x-4">
+          <span className="text-gray-600 dark:text-gray-400">
+            {document.type.type.charAt(0).toUpperCase() + document.type.type.slice(1)}
+            {document.language && ` • ${document.language}`}
+          </span>
+        </div>
 
-            {/* Info footer - optional */}
-            {showInfo && document && (<div
-                    className="py-1 px-3 flex justify-between text-xs border-t"
-                    style={{
-                        backgroundColor: currentTheme.colors.sidebar,
-                        borderColor: currentTheme.colors.border,
-                        color: currentTheme.isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)'
-                    }}
-                >
-                    <div>
-                        {document.type.type.charAt(0).toUpperCase() + document.type.type.slice(1)}
-                        {document.language && ` • ${document.language}`}
-                    </div>
-
-                    <div className="space-x-3">
-                        <span>Words: {stats.wordCount}</span>
-                        <span>Chars: {stats.characterCount}</span>
-                        <span>Lines: {stats.lineCount}</span>
-                        <span>Read: ~{stats.readingTimeMinutes} min</span>
-                        <span>Last saved: {lastSaved.toLocaleTimeString()}</span>
-                    </div>
-                </div>)}
-        </div>);
+        <div className="flex items-center space-x-4">
+          {isDirty && !isSaving && (
+            <span className="text-yellow-600 dark:text-yellow-400">• Unsaved changes</span>
+          )}
+          {isSaving && (
+            <span className="text-blue-600 dark:text-blue-400">Saving...</span>
+          )}
+          {!isDirty && !isSaving && lastSaved && (
+            <span className="text-green-600 dark:text-green-400">
+              Saved at {lastSaved.toLocaleTimeString()}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default DocumentEditor;

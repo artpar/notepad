@@ -94,9 +94,9 @@ function AppContent() {
                 const newDoc = documents.find(doc => doc.id && parseInt(doc.id) === id);
                 if (newDoc) {
                     dockviewApi.addPanel({
-                        id: `editor-${id}`, 
-                        component: 'documentEditor', 
-                        params: { document: newDoc, documentId: id }, 
+                        id: `editor-${id}`,
+                        component: 'documentEditor',
+                        params: { document: newDoc, documentId: id },
                         title: newDoc.title
                     });
                     saveLayoutRef.current();
@@ -124,9 +124,9 @@ function AppContent() {
             } else {
                 // Open new editor panel
                 dockviewApi.addPanel({
-                    id: `editor-${doc.id}`, 
-                    component: 'documentEditor', 
-                    params: { document: doc, documentId: parseInt(doc.id) }, 
+                    id: `editor-${doc.id}`,
+                    component: 'documentEditor',
+                    params: { document: doc, documentId: parseInt(doc.id) },
                     title: doc.title
                 });
             }
@@ -349,9 +349,9 @@ function AppContent() {
         // If we have an active document, open it
         if (activeDocument) {
             api.addPanel({
-                id: `editor-${activeDocument.id}`, 
-                component: 'documentEditor', 
-                params: { document: activeDocument, documentId: parseInt(activeDocument.id) }, 
+                id: `editor-${activeDocument.id}`,
+                component: 'documentEditor',
+                params: { document: activeDocument, documentId: parseInt(activeDocument.id) },
                 title: activeDocument.title
             });
         }
@@ -380,7 +380,7 @@ function AppContent() {
                             // Add the document to the panel params
                             panelObject.params.document = doc;
                             panelObject.params.documentId = typeof docId === 'string' ? parseInt(docId, 10) : docId;
-                            
+
                             // Open the document in context to set it as active
                             if (panelObject.component === 'documentEditor') {
                                 const numericId = typeof docId === 'string' ? parseInt(docId, 10) : docId;
@@ -394,7 +394,7 @@ function AppContent() {
                     }
                 }
                 event.api.fromJSON(savedLayout);
-                
+
                 // After restoring layout, find the first editor panel and make its document active
                 setTimeout(() => {
                     const groups = event.api.groups;
@@ -428,7 +428,7 @@ function AppContent() {
                 console.error('Error auto-saving layout on change:', error);
             });
         });
-        
+
         // Track active panel changes
         event.api.onDidActivePanelChange((panel) => {
             if (panel && panel.id.startsWith('editor-')) {
@@ -443,7 +443,7 @@ function AppContent() {
 
         // Set loading to false once everything is initialized
         setIsLoading(false);
-    }, [savedLayout, updateDocument, initializeDefaultLayout, openContextDocument]);
+    }, [savedLayout, initializeDefaultLayout, openContextDocument]);
 
     // Components for the dockview
     const components = useMemo<PanelCollection>(() => ({
@@ -563,7 +563,7 @@ function AppContent() {
                 backgroundColor: currentTheme.colors.background, color: currentTheme.colors.foreground
             }}
         >
-            
+
             {/* Confirmation Modal for deletion */}
             <ConfirmationModal
                 isOpen={documentToDelete !== null}
@@ -642,7 +642,7 @@ function AppContent() {
                             <i className="ri-menu-unfold-line text-lg"></i>
                         </button>
                     )}
-                    
+
                     <DockviewReact
                         components={components}
                         onReady={handleDockviewReady}

@@ -1,7 +1,6 @@
 // src/components/Layout/Sidebar.tsx
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useSettings} from '../../contexts/SettingsContext';
-import useDocumentActions from '../../hooks/useDocumentActions';
 import {Document} from '../../types/document';
 import DocumentItem from './DocumentItem';
 import SearchBar from '../UI/SearchBar';
@@ -276,7 +275,7 @@ const Sidebar: React.FC<SidebarProps> = ({onToggleSidebar, onSelectDocument}) =>
     }, [handleManualSave, handleExport]);
 
     // Check if document needs manual save
-    const needsSave = activeDocument && !settings.editor.autoSave && 
+    const needsSave = activeDocument && !settings.editor.autoSave &&
                      documentStates[parseInt(activeDocument.id)]?.isDirty;
 
     return (<>
@@ -391,9 +390,9 @@ const Sidebar: React.FC<SidebarProps> = ({onToggleSidebar, onSelectDocument}) =>
                                             {option === 'date' ? 'Last modified' : option === 'name' ? 'Name' : 'Type'}
                                         </button>
                                     ))}
-                                    
+
                                     <div className="my-1 border-t" style={{borderColor: currentTheme.colors.border}}></div>
-                                    
+
                                     {/* Theme toggle */}
                                     <button
                                         className="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-opacity-10 hover:bg-gray-500 flex items-center"

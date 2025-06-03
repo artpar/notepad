@@ -1,6 +1,6 @@
 /**
  * Example of how to integrate the new clean save architecture
- * 
+ *
  * This example shows:
  * 1. Using the new DocumentProviderV2 with simplified state management
  * 2. Using the useAutoSave hook in editors
@@ -11,17 +11,17 @@
 import React from 'react';
 import { DocumentProvider } from './contexts/DocumentProviderV2';
 import { useDocuments } from './contexts/DocumentProviderV2';
-import DocumentEditorV2 from './components/Editor/DocumentEditorV2';
+import DocumentEditor from './components/Editor/DocumentEditor.tsx';
 import { DocumentType } from './types/DocumentType';
 
 // Example component showing how to use the new architecture
 const ExampleEditor: React.FC = () => {
-  const { 
-    activeDocument, 
-    createDocument, 
+  const {
+    activeDocument,
+    createDocument,
     openDocument,
     documents,
-    documentStates 
+    documentStates
   } = useDocuments();
 
   return (
@@ -29,7 +29,7 @@ const ExampleEditor: React.FC = () => {
       {/* Sidebar */}
       <div className="w-64 border-r p-4">
         <h2 className="text-lg font-bold mb-4">Documents</h2>
-        
+
         {/* Create new document button */}
         <button
           onClick={() => createDocument({ type: 'markdown' } as DocumentType)}
@@ -37,7 +37,7 @@ const ExampleEditor: React.FC = () => {
         >
           New Document
         </button>
-        
+
         {/* Document list */}
         <div className="space-y-2">
           {documents.map(doc => (
@@ -62,7 +62,7 @@ const ExampleEditor: React.FC = () => {
       {/* Editor */}
       <div className="flex-1">
         {activeDocument ? (
-          <DocumentEditorV2 document={activeDocument} />
+          <DocumentEditor document={activeDocument} />
         ) : (
           <div className="h-full flex items-center justify-center text-gray-500">
             Select a document or create a new one
